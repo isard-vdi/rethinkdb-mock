@@ -1102,3 +1102,70 @@ class Info(RBase):
 
 class Http(RBase):
     pass
+
+
+class RRow(RBase):
+    """r.row - Reference to the currently visited document"""
+
+    def run(self, arg, scope):
+        # In RethinkDB, r.row refers to the current document being processed
+        # This is passed as the 'arg' parameter in function contexts
+        return arg
+
+
+class GetField(BinExp):
+    """Get a single field from an object, alternative to bracket notation"""
+
+    def do_run(self, obj, field_name, arg, scope):
+        from rethinkdb_mock.db import MockTableData
+
+        if isinstance(obj, MockTableData):
+            # If obj is a table, apply get_field to all rows
+            return [row.get(field_name) for row in obj.get_rows()]
+        elif isinstance(obj, dict):
+            if field_name in obj:
+                return obj[field_name]
+            else:
+                # RethinkDB raises an error for missing fields on single documents
+                raise ReqlNonExistenceError(f"No attribute `{field_name}` in object")
+        else:
+            raise ReqlNonExistenceError(f"No attribute `{field_name}` in object")
+
+
+class Values(MonExp):
+    """Return an array containing all of an object's values"""
+
+    def do_run(self, obj, arg, scope):
+        if isinstance(obj, dict):
+            return list(obj.values())
+        else:
+            raise TypeError("Cannot call `values` on a non-object")
+
+
+class RObject(RBase):
+    """Creates an object from a list of key-value pairs"""
+
+    def __init__(self, *args, optargs=None):
+        self._args = args
+        self.optargs = optargs if optargs is not None else {}
+        super().__init__(*args)
+
+    def run(self, arg, scope):
+        # This function takes arguments in pairs: key1, value1, key2, value2, ...
+        if hasattr(self, "_args") and self._args:
+            args = [a.run(arg, scope) if hasattr(a, "run") else a for a in self._args]
+            if len(args) % 2 != 0:
+                raise ValueError(
+                    "object() requires an even number of arguments (key-value pairs)"
+                )
+
+            result = {}
+            for i in range(0, len(args), 2):
+                key = args[i]
+                value = args[i + 1]
+                if not isinstance(key, str):
+                    raise TypeError("Object keys must be strings")
+                result[key] = value
+
+            return result
+        return {}

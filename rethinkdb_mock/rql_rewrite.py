@@ -151,6 +151,7 @@ NORMAL_ZEROPS = {
     r_ast.Now: mt_ast.Now,
     r_ast.DbList: mt_ast.DbList,
     r_ast.TableListTL: mt_ast.TableListTL,
+    r_ast.ImplicitVar: mt_ast.RRow,
 }
 
 
@@ -189,6 +190,7 @@ NORMAL_MONOPS = {
     r_ast.Distinct: mt_ast.Distinct,
     r_ast.ISO8601: mt_ast.ISO8601,
     r_ast.Wait: mt_ast.Wait,
+    r_ast.Values: mt_ast.Values,
 }
 
 #   2-ary reql terms which don't need any special handling
@@ -229,6 +231,7 @@ NORMAL_BINOPS = {
     r_ast.Default: mt_ast.RDefault,
     r_ast.CoerceTo: mt_ast.CoerceTo,
     r_ast.Limit: mt_ast.Limit,
+    r_ast.GetField: mt_ast.GetField,
 }
 
 
@@ -360,6 +363,13 @@ def handle_make_array(node):
 @handles_type(r_ast.MakeObj)
 def handle_make_obj(node):
     return ast_base.MakeObj({k: type_dispatch(v) for k, v in iteritems(node.optargs)})
+
+
+@handles_type(r_ast.Object)
+def handle_object(node):
+    # Object takes variadic arguments (key-value pairs)
+    processed_args = [type_dispatch(arg) for arg in node._args]
+    return mt_ast.RObject(*processed_args, optargs=process_optargs(node))
 
 
 @handles_type(r_ast.Func)

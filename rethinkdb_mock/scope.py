@@ -37,3 +37,20 @@ class Scope(object):
 
     def log(self):
         pprint(self.get_flattened())
+
+    def get_current_row(self):
+        """Get the current row/document being processed"""
+        if hasattr(self, "current_row"):
+            return self.current_row
+        elif hasattr(self, "parent"):
+            return self.parent.get_current_row()
+        else:
+            raise NotInScopeErr("No current row available in this context")
+
+    def with_current_row(self, row):
+        """Create a new scope with the current row set"""
+        new_scope = Scope(self.values)
+        new_scope.current_row = row
+        if hasattr(self, "parent"):
+            new_scope.parent = self.parent
+        return new_scope
