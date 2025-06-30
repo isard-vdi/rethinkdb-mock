@@ -191,6 +191,8 @@ NORMAL_MONOPS = {
     r_ast.ISO8601: mt_ast.ISO8601,
     r_ast.Wait: mt_ast.Wait,
     r_ast.Values: mt_ast.Values,
+    r_ast.Ceil: mt_ast.Ceil,
+    r_ast.Floor: mt_ast.Floor,
 }
 
 #   2-ary reql terms which don't need any special handling
@@ -292,6 +294,7 @@ OPS_BY_ARITY = {
         3: mt_ast.StrSplitOnLimit,
     },
     r_ast.Random: {0: mt_ast.Random0, 1: mt_ast.Random1, 2: mt_ast.Random2},
+    r_ast.Round: {1: mt_ast.Round, 2: mt_ast.RoundWithPrecision},
     r_ast.IndexCreate: {2: mt_ast.IndexCreateByField, 3: mt_ast.IndexCreateByFunc},
     r_ast.IndexWait: {1: mt_ast.IndexWaitAll, 2: mt_ast.IndexWaitOne},
     r_ast.UserError: {0: mt_ast.RError0, 1: mt_ast.RError1},

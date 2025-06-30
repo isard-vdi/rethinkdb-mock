@@ -247,6 +247,39 @@ class Mod(BinOp):
     binop = operator.mod
 
 
+# Math functions
+class Round(MonExp):
+    """Round a number to the nearest integer or to a specified number of decimal places"""
+
+    def do_run(self, number, arg, scope):
+        return round(number)
+
+
+class RoundWithPrecision(BinExp):
+    """Round a number to a specified number of decimal places"""
+
+    def do_run(self, number, precision, arg, scope):
+        return round(number, precision)
+
+
+class Ceil(MonExp):
+    """Round a number up to the nearest integer"""
+
+    def do_run(self, number, arg, scope):
+        import math
+
+        return math.ceil(number)
+
+
+class Floor(MonExp):
+    """Round a number down to the nearest integer"""
+
+    def do_run(self, number, arg, scope):
+        import math
+
+        return math.floor(number)
+
+
 class And(BinOp):
     binop = operator.and_
 
@@ -919,32 +952,17 @@ class SpliceAt(Ternary):
         return util.splice_at(value, index, sequence)
 
 
+class DeleteAt(BinExp):
+    def do_run(self, sequence, index, arg, scope):
+        return util.delete_at(index, sequence)
+
+
 class ChangeAt(Ternary):
     def do_run(self, sequence, index, value, arg, scope):
         return util.change_at(value, index, sequence)
 
 
-class DeleteAt(BinExp):
-    def do_run(self, sequence, indices, arg, scope):
-        return list(util.without_indices(indices, sequence))
-
-
-# ###########
-#   Joins
-# ###########
-
-
-class EqJoin(Ternary):
-    def do_run(self, left, field, right, arg, scope):
-        return joins.do_eq_join(field, left, "id", right)
-
-
-class InnerOuterJoinBase(RBase):
-    def __init__(self, left, middle, right, optargs={}):
-        self.left = left
-        self.middle = middle
-        self.right = right
-
+class InnerOuterJoinBase(Ternary):
     def run(self, arg, scope):
         left_seq = self.left.run(arg, scope)
         right_seq = self.middle.run(arg, scope)
@@ -953,6 +971,11 @@ class InnerOuterJoinBase(RBase):
             return self.right.run([x, y], scope)
 
         return self.do_run(left_seq, right_seq, pred, arg, scope)
+
+
+class EqJoin(Ternary):
+    def do_run(self, left, right, pred, arg, scope):
+        return joins.do_eq_join(pred, left, right)
 
 
 class InnerJoin(InnerOuterJoinBase):

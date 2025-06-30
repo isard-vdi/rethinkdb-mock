@@ -127,3 +127,69 @@ class TestRandom(MockTest):
         assert result <= 20
         assert result >= 10
         assert type(result) is float
+
+    def test_round_basic(self, conn):
+        """Test basic round functionality"""
+        result = r.expr(3.14159).round().run(conn)
+        assertEqual(3, result)
+
+    def test_round_negative(self, conn):
+        """Test round with negative numbers"""
+        result = r.expr(-3.7).round().run(conn)
+        assertEqual(-4, result)
+
+    def test_round_with_precision(self, conn):
+        """Test round with specified precision"""
+        result = r.expr(3.14159).round(2).run(conn)
+        assertEqual(3.14, result)
+
+    def test_round_zero_precision(self, conn):
+        """Test round with zero precision"""
+        result = r.expr(3.14159).round(0).run(conn)
+        assertEqual(3.0, result)
+
+    def test_ceil_basic(self, conn):
+        """Test basic ceil functionality"""
+        result = r.expr(3.14159).ceil().run(conn)
+        assertEqual(4, result)
+
+    def test_ceil_negative(self, conn):
+        """Test ceil with negative numbers"""
+        result = r.expr(-3.7).ceil().run(conn)
+        assertEqual(-3, result)
+
+    def test_ceil_integer(self, conn):
+        """Test ceil with integer input"""
+        result = r.expr(5).ceil().run(conn)
+        assertEqual(5, result)
+
+    def test_floor_basic(self, conn):
+        """Test basic floor functionality"""
+        result = r.expr(3.14159).floor().run(conn)
+        assertEqual(3, result)
+
+    def test_floor_negative(self, conn):
+        """Test floor with negative numbers"""
+        result = r.expr(-3.2).floor().run(conn)
+        assertEqual(-4, result)
+
+    def test_floor_integer(self, conn):
+        """Test floor with integer input"""
+        result = r.expr(5).floor().run(conn)
+        assertEqual(5, result)
+
+    def test_math_in_query(self, conn):
+        """Test math functions within a query"""
+        expected = [{"id": "pt-1", "x_rounded": 10}, {"id": "pt-2", "x_rounded": 100}]
+        result = list(
+            r.db("math_db")
+            .table("points")
+            .map(
+                lambda pt: {
+                    "id": pt["id"],
+                    "x_rounded": pt["x"].add(0.4).round(),
+                }
+            )
+            .run(conn)
+        )
+        assertEqUnordered(expected, result)

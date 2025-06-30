@@ -103,6 +103,13 @@ def change_at(val, index, a_list):
 
 
 @curry2
+def delete_at(index, a_list):
+    """Delete element at the specified index"""
+    right_start = index + 1
+    return cat(a_list[0:index], a_list[right_start:])
+
+
+@curry2
 def extend_with(a_dict, to_extend):
     return extend(to_extend, a_dict)
 
