@@ -199,6 +199,9 @@ NORMAL_MONOPS = {
     r_ast.DayOfYear: mt_ast.DayOfYear,
     r_ast.ToISO8601: mt_ast.ToIso8601,
     r_ast.ToJsonString: mt_ast.ToJsonString,
+    r_ast.Config: mt_ast.Config,
+    r_ast.Status: mt_ast.Status,
+    r_ast.GetWriteHook: mt_ast.GetWriteHook,
 }
 
 #   2-ary reql terms which don't need any special handling
@@ -223,6 +226,7 @@ NORMAL_BINOPS = {
     r_ast.BitSal: mt_ast.BitSal,
     r_ast.BitSar: mt_ast.BitSar,
     r_ast.InTimezone: mt_ast.InTimezone,
+    r_ast.SetWriteHook: mt_ast.SetWriteHook,
     r_ast.Bracket: mt_ast.Bracket,
     r_ast.Table: mt_ast.RTable,
     r_ast.Get: mt_ast.Get,
@@ -309,6 +313,7 @@ OPS_BY_ARITY = {
     r_ast.Random: {0: mt_ast.Random0, 1: mt_ast.Random1, 2: mt_ast.Random2},
     r_ast.Round: {1: mt_ast.Round, 2: mt_ast.RoundWithPrecision},
     r_ast.Range: {1: mt_ast.Range1, 2: mt_ast.Range2, 3: mt_ast.Range3},
+    r_ast.IndexStatus: {1: mt_ast.IndexStatus, 2: mt_ast.IndexStatusOne},
     r_ast.IndexCreate: {2: mt_ast.IndexCreateByField, 3: mt_ast.IndexCreateByFunc},
     r_ast.IndexWait: {1: mt_ast.IndexWaitAll, 2: mt_ast.IndexWaitOne},
     r_ast.UserError: {0: mt_ast.RError0, 1: mt_ast.RError1},

@@ -1353,3 +1353,151 @@ class Fold(Ternary):
             accumulator = fold_result
 
         return accumulator
+
+
+class IndexStatus(MonExp):
+    """Get the status of indexes on a table"""
+
+    def do_run(self, table, arg, scope):
+        current_db = self.find_db_scope()
+        current_table = self.find_table_scope()
+
+        # Return status information for all indexes
+        indexes = arg.list_indexes_in_table_in_db(current_db, current_table)
+
+        status_list = []
+        for index_name in indexes:
+            status_list.append(
+                {
+                    "index": index_name,
+                    "ready": True,  # Mock indexes are always ready
+                    "function": index_name,  # Simplified representation
+                    "multi": False,  # Default to single-value index
+                    "progress": 1.0,  # Always 100% complete
+                }
+            )
+
+        return status_list
+
+
+class IndexStatusOne(BinExp):
+    """Get the status of a specific index on a table"""
+
+    def do_run(self, table, index_name, arg, scope):
+        current_db = self.find_db_scope()
+        current_table = self.find_table_scope()
+
+        # Check if index exists
+        exists = arg.index_exists_in_table_in_db(current_db, current_table, index_name)
+        if not exists:
+            raise ReqlNonExistenceError(f"Index `{index_name}` does not exist")
+
+        # Return status for the specific index
+        return [
+            {
+                "index": index_name,
+                "ready": True,  # Mock indexes are always ready
+                "function": index_name,  # Simplified representation
+                "multi": False,  # Default to single-value index
+                "progress": 1.0,  # Always 100% complete
+            }
+        ]
+
+
+class Config(MonExp):
+    """Get configuration information for a table or database"""
+
+    def do_run(self, obj, arg, scope):
+        # For mock implementation, return basic config info
+        if hasattr(self.left, "find_table_scope"):
+            # Table config
+            current_db = self.find_db_scope()
+            current_table = self.find_table_scope()
+            return {
+                "id": f"{current_db}.{current_table}",
+                "name": current_table,
+                "db": current_db,
+                "primary_key": "id",
+                "shards": [
+                    {"primary_replica": "mock_server", "replicas": ["mock_server"]}
+                ],
+                "indexes": [],
+                "write_acks": "majority",
+                "durability": "hard",
+            }
+        else:
+            # Database config
+            db_name = self.find_db_scope()
+            return {"id": db_name, "name": db_name}
+
+
+class Status(MonExp):
+    """Get status information for a table or database"""
+
+    def do_run(self, obj, arg, scope):
+        if hasattr(self.left, "find_table_scope"):
+            # Table status
+            current_db = self.find_db_scope()
+            current_table = self.find_table_scope()
+            return {
+                "id": f"{current_db}.{current_table}",
+                "name": current_table,
+                "db": current_db,
+                "status": {
+                    "ready_for_outdated_reads": True,
+                    "ready_for_reads": True,
+                    "ready_for_writes": True,
+                    "all_replicas_ready": True,
+                },
+                "shards": [
+                    {
+                        "primary_replica": "mock_server",
+                        "replicas": [{"server": "mock_server", "state": "ready"}],
+                    }
+                ],
+            }
+        else:
+            # Database status
+            db_name = self.find_db_scope()
+            return {
+                "id": db_name,
+                "name": db_name,
+                "status": {
+                    "ready_for_outdated_reads": True,
+                    "ready_for_reads": True,
+                    "ready_for_writes": True,
+                    "all_replicas_ready": True,
+                },
+            }
+
+
+# Table write hook functions (simplified mock implementations)
+class SetWriteHook(BinExp):
+    """Set a write hook for a table (mock implementation)"""
+
+    def do_run(self, table, hook_function, arg, scope):
+        current_db = self.find_db_scope()
+        current_table = self.find_table_scope()
+
+        # In a real implementation, this would store the hook function
+        # For mock, we just return success
+        return {
+            "created": 1,
+            "replaced": 0,
+            "unchanged": 0,
+            "errors": 0,
+            "first_error": None,
+            "inserted": 0,
+            "deleted": 0,
+        }
+
+
+class GetWriteHook(MonExp):
+    """Get the write hook for a table (mock implementation)"""
+
+    def do_run(self, table, arg, scope):
+        current_db = self.find_db_scope()
+        current_table = self.find_table_scope()
+
+        # For mock implementation, return null (no hook set)
+        return None
