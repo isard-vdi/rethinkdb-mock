@@ -408,3 +408,50 @@ class TestTimeCalculation(MockTest):
         result = table.filter(old).run(conn)
         result = list(result)
         assertEqual(2, len(result))  # present and future
+
+
+class TestEpochTime(MockTest):
+    @staticmethod
+    def get_data():
+        return as_db_and_table("test_db", "times", [])
+
+    def test_epoch_time_basic(self, conn):
+        """Test basic epoch_time functionality"""
+        # 2021-01-01 00:00:00 UTC
+        timestamp = 1609459200
+        result = r.epoch_time(timestamp).run(conn)
+
+        # Should return a datetime object
+        assert isinstance(result, datetime.datetime)
+        assertEqual(2021, result.year)
+        assertEqual(1, result.month)
+        assertEqual(1, result.day)
+
+    def test_epoch_time_zero(self, conn):
+        """Test epoch_time with timestamp 0 (Unix epoch)"""
+        result = r.epoch_time(0).run(conn)
+
+        assert isinstance(result, datetime.datetime)
+        assertEqual(1970, result.year)
+        assertEqual(1, result.month)
+        assertEqual(1, result.day)
+
+    def test_epoch_time_negative(self, conn):
+        """Test epoch_time with negative timestamp (before 1970)"""
+        # 1969-12-31 23:00:00 UTC (1 hour before epoch)
+        timestamp = -3600
+        result = r.epoch_time(timestamp).run(conn)
+
+        assert isinstance(result, datetime.datetime)
+        assertEqual(1969, result.year)
+        assertEqual(12, result.month)
+        assertEqual(31, result.day)
+
+    def test_epoch_time_fractional(self, conn):
+        """Test epoch_time with fractional seconds"""
+        timestamp = 1609459200.5
+        result = r.epoch_time(timestamp).run(conn)
+
+        assert isinstance(result, datetime.datetime)
+        assertEqual(2021, result.year)
+        # Should handle fractional seconds

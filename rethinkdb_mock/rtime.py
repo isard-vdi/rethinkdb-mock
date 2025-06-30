@@ -39,6 +39,11 @@ def epoch_time(dt):
     return int((dt - jan1_1970).total_seconds())
 
 
+def from_epoch_time(timestamp):
+    """Create a datetime object from Unix epoch time (seconds since 1970-01-01)"""
+    return datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
+
+
 def rql_compatible_time(year, month, day, *args):
     hour, minute, second = (0, 0, 0)
     arg_count = len(args)

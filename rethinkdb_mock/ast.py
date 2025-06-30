@@ -280,6 +280,57 @@ class Floor(MonExp):
         return math.floor(number)
 
 
+# Control structure functions
+class Range1(MonExp):
+    """Generate a range from 0 to n (exclusive)"""
+
+    def do_run(self, end_val, arg, scope):
+        return list(range(int(end_val)))
+
+
+class Range2(BinExp):
+    """Generate a range from start to end (exclusive)"""
+
+    def do_run(self, start_val, end_val, arg, scope):
+        return list(range(int(start_val), int(end_val)))
+
+
+class Range3(Ternary):
+    """Generate a range from start to end (exclusive) with step"""
+
+    def do_run(self, start_val, end_val, step_val, arg, scope):
+        return list(range(int(start_val), int(end_val), int(step_val)))
+
+
+# Bitwise operations
+class BitAnd(BinExp):
+    """Bitwise AND operation"""
+
+    def do_run(self, left_val, right_val, arg, scope):
+        return int(left_val) & int(right_val)
+
+
+class BitOr(BinExp):
+    """Bitwise OR operation"""
+
+    def do_run(self, left_val, right_val, arg, scope):
+        return int(left_val) | int(right_val)
+
+
+class BitXor(BinExp):
+    """Bitwise XOR operation"""
+
+    def do_run(self, left_val, right_val, arg, scope):
+        return int(left_val) ^ int(right_val)
+
+
+class BitNot(MonExp):
+    """Bitwise NOT operation"""
+
+    def do_run(self, val, arg, scope):
+        return ~int(val)
+
+
 class And(BinOp):
     binop = operator.and_
 
@@ -1049,6 +1100,13 @@ class Now(RBase):
 class ToEpochTime(MonExp):
     def do_run(self, dtime, arg, scope):
         return rtime.epoch_time(dtime)
+
+
+class EpochTime(MonExp):
+    """Create a time object from Unix epoch time (seconds since 1970-01-01)"""
+
+    def do_run(self, timestamp, arg, scope):
+        return rtime.from_epoch_time(timestamp)
 
 
 class ISO8601(MonExp):

@@ -186,6 +186,7 @@ NORMAL_MONOPS = {
     r_ast.DayOfWeek: mt_ast.DayOfWeek,
     r_ast.Date: mt_ast.Date,
     r_ast.ToEpochTime: mt_ast.ToEpochTime,
+    r_ast.EpochTime: mt_ast.EpochTime,
     r_ast.Literal: mt_ast.Literal,
     r_ast.Distinct: mt_ast.Distinct,
     r_ast.ISO8601: mt_ast.ISO8601,
@@ -193,6 +194,7 @@ NORMAL_MONOPS = {
     r_ast.Values: mt_ast.Values,
     r_ast.Ceil: mt_ast.Ceil,
     r_ast.Floor: mt_ast.Floor,
+    r_ast.BitNot: mt_ast.BitNot,
 }
 
 #   2-ary reql terms which don't need any special handling
@@ -211,6 +213,9 @@ NORMAL_BINOPS = {
     r_ast.Mul: mt_ast.Mul,
     r_ast.Div: mt_ast.Div,
     r_ast.Mod: mt_ast.Mod,
+    r_ast.BitAnd: mt_ast.BitAnd,
+    r_ast.BitOr: mt_ast.BitOr,
+    r_ast.BitXor: mt_ast.BitXor,
     r_ast.Bracket: mt_ast.Bracket,
     r_ast.Table: mt_ast.RTable,
     r_ast.Get: mt_ast.Get,
@@ -295,6 +300,7 @@ OPS_BY_ARITY = {
     },
     r_ast.Random: {0: mt_ast.Random0, 1: mt_ast.Random1, 2: mt_ast.Random2},
     r_ast.Round: {1: mt_ast.Round, 2: mt_ast.RoundWithPrecision},
+    r_ast.Range: {1: mt_ast.Range1, 2: mt_ast.Range2, 3: mt_ast.Range3},
     r_ast.IndexCreate: {2: mt_ast.IndexCreateByField, 3: mt_ast.IndexCreateByFunc},
     r_ast.IndexWait: {1: mt_ast.IndexWaitAll, 2: mt_ast.IndexWaitOne},
     r_ast.UserError: {0: mt_ast.RError0, 1: mt_ast.RError1},
