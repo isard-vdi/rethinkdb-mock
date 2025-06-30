@@ -148,7 +148,15 @@ class RTable(BinExp):
 
 class Bracket(BinExp):
     def do_run(self, thing, thing_attr, arg, scope):
-        return thing[thing_attr]
+        from rethinkdb_mock.db import MockTableData
+        from rethinkdb_mock import util
+
+        # If thing is a MockTableData (table), map the bracket operation over its rows
+        if isinstance(thing, MockTableData):
+            return [row[thing_attr] for row in thing]
+        else:
+            # For everything else (documents, lists, etc.), just access the attribute/index
+            return thing[thing_attr]
 
 
 class Get(BinExp):
