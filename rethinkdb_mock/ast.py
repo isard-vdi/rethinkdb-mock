@@ -148,8 +148,8 @@ class RTable(BinExp):
 
 class Bracket(BinExp):
     def do_run(self, thing, thing_attr, arg, scope):
-        from rethinkdb_mock.db import MockTableData
         from rethinkdb_mock import util
+        from rethinkdb_mock.db import MockTableData
 
         # If thing is a MockTableData (table), map the bracket operation over its rows
         if isinstance(thing, MockTableData):
@@ -1033,8 +1033,10 @@ class InnerOuterJoinBase(Ternary):
 
 
 class EqJoin(Ternary):
-    def do_run(self, left, right, pred, arg, scope):
-        return joins.do_eq_join(pred, left, right)
+    def do_run(self, left, middle, right, arg, scope):
+        # left = left table, middle = field name, right = right table
+        # EqJoin assumes joining on primary key ("id") of right table
+        return joins.do_eq_join(middle, left, "id", right)
 
 
 class InnerJoin(InnerOuterJoinBase):
@@ -1349,15 +1351,28 @@ class ToJsonString(MonExp):
 
 # Fold aggregation function
 class Fold(Ternary):
+    def run(self, arg, scope):
+        # Handle the sequence and base value normally
+        self.set_mock_ref(self.left)
+        self.set_mock_ref(self.middle)
+        # Don't run the function immediately - we'll call it later
+        self.set_mock_ref(self.right)
+
+        sequence = self.left.run(arg, scope)
+        base = self.middle.run(arg, scope)
+        fold_func = self.right  # Keep the function object, don't run it
+
+        return self.do_run(sequence, base, fold_func, arg, scope)
+
     def do_run(self, sequence, base, fold_func, arg, scope):
         if not hasattr(sequence, "__iter__"):
             raise TypeError("fold() can only be applied to sequences")
 
         accumulator = base
         for item in sequence:
-            # The fold function takes (accumulator, current_item) as arguments
-            # Create a new function call with these arguments
-            fold_result = fold_func.do_call([accumulator, item], scope)
+            # Call the fold function with accumulator and item
+            # The function expects two arguments: accumulator and current item
+            fold_result = fold_func.run([accumulator, item], scope)
             accumulator = fold_result
 
         return accumulator
@@ -1417,10 +1432,10 @@ class Config(MonExp):
 
     def do_run(self, obj, arg, scope):
         # For mock implementation, return basic config info
-        if hasattr(self.left, "find_table_scope"):
+        current_table = self.find_table_scope()
+        if current_table is not None:
             # Table config
             current_db = self.find_db_scope()
-            current_table = self.find_table_scope()
             return {
                 "id": f"{current_db}.{current_table}",
                 "name": current_table,
@@ -1437,16 +1452,17 @@ class Config(MonExp):
             # Database config
             db_name = self.find_db_scope()
             return {"id": db_name, "name": db_name}
+            return {"id": db_name, "name": db_name}
 
 
 class Status(MonExp):
     """Get status information for a table or database"""
 
     def do_run(self, obj, arg, scope):
-        if hasattr(self.left, "find_table_scope"):
+        current_table = self.find_table_scope()
+        if current_table is not None:
             # Table status
             current_db = self.find_db_scope()
-            current_table = self.find_table_scope()
             return {
                 "id": f"{current_db}.{current_table}",
                 "name": current_table,

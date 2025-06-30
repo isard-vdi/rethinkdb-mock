@@ -3,7 +3,8 @@ Tests for table management and administrative functions in rethinkdb-mock
 """
 
 import pytest
-import rethinkdb as r
+from rethinkdb import r
+from tests.common import assertEqual
 from tests.functional.common import MockTest
 
 
@@ -73,12 +74,8 @@ class TestTableManagement(MockTest):
         assert result["status"]["all_replicas_ready"] is True
         assert "shards" in result
 
-        # Test database status
-        result = r.db("test_db").status().run(conn)
-        assert isinstance(result, dict)
-        assert result["name"] == "test_db"
-        assert "status" in result
-        assert result["status"]["ready_for_reads"] is True
+        # Note: Database status() is not a valid operation in RethinkDB
+        # Only tables have status() method
 
     def test_write_hooks(self, conn):
         """Test set_write_hook() and get_write_hook() functions"""

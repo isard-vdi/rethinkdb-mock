@@ -3,7 +3,7 @@ from tests.common import assertEqual
 from tests.functional.common import MockTest
 
 
-class TestFoldFunctions(MockTest):
+class TestFold(MockTest):
     @staticmethod
     def get_data():
         return {

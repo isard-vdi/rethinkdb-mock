@@ -105,6 +105,9 @@ def change_at(val, index, a_list):
 @curry2
 def delete_at(index, a_list):
     """Delete element at the specified index"""
+    # Handle case where index is passed as a list (from RethinkDB AST)
+    if isinstance(index, list) and len(index) == 1:
+        index = index[0]
     right_start = index + 1
     return cat(a_list[0:index], a_list[right_start:])
 

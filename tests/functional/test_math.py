@@ -95,8 +95,21 @@ class TestMath2(MockTest):
 class TestRandom(MockTest):
     @staticmethod
     def get_data():
-        data = [{"id": "x", "val": 12}, {"id": "y", "val": 30}]
-        return as_db_and_table("things", "pointless", data)
+        # Provide data for both "things" db (for random tests) and "math_db" (for math_in_query test)
+        return {
+            "dbs": {
+                "things": {
+                    "tables": {
+                        "pointless": [{"id": "x", "val": 12}, {"id": "y", "val": 30}]
+                    }
+                },
+                "math_db": {
+                    "tables": {
+                        "points": [{"id": "pt-1", "x": 9.6}, {"id": "pt-2", "x": 99.6}]
+                    }
+                },
+            }
+        }
 
     def test_random_0(self, conn):
         result = r.random().run(conn)
