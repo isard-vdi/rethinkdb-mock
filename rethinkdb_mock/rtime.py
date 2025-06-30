@@ -13,7 +13,51 @@ def time_of_day_seconds(dt):
 
 
 def day_of_year(dt):
-    raise NotImplementedError
+    """Get the day of year (1-366) for the given datetime"""
+    return dt.timetuple().tm_yday
+
+
+def in_timezone(dt, timezone_str):
+    """Convert datetime to specified timezone"""
+    if timezone_str == "Z" or timezone_str == "+00:00":
+        new_tz = datetime.timezone.utc
+    else:
+        # Parse timezone string like "+05:30" or "-08:00"
+        if timezone_str.startswith(("+", "-")):
+            sign = 1 if timezone_str[0] == "+" else -1
+            hours, minutes = map(int, timezone_str[1:].split(":"))
+            offset = sign * (hours * 60 + minutes)
+            new_tz = datetime.timezone(datetime.timedelta(minutes=offset))
+        else:
+            raise ValueError(f"Unsupported timezone format: {timezone_str}")
+
+    return dt.astimezone(new_tz)
+
+
+def get_timezone(dt):
+    """Get the timezone offset string for the given datetime"""
+    if dt.tzinfo is None:
+        return "+00:00"
+
+    offset = dt.utcoffset()
+    if offset is None:
+        return "+00:00"
+
+    total_seconds = int(offset.total_seconds())
+    hours, remainder = divmod(abs(total_seconds), 3600)
+    minutes = remainder // 60
+    sign = "+" if total_seconds >= 0 else "-"
+    return f"{sign}{hours:02d}:{minutes:02d}"
+
+
+def to_iso8601(dt):
+    """Convert datetime to ISO8601 string format"""
+    if dt.tzinfo is None:
+        # Assume UTC if no timezone info
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+
+    # Format: YYYY-MM-DDTHH:MM:SS.sss+00:00
+    return dt.isoformat()
 
 
 def make_time(year, month, day, hour=0, minute=0, second=0, timezone=None):

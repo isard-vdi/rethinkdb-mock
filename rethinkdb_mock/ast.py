@@ -1250,3 +1250,106 @@ class RObject(RBase):
 
             return result
         return {}
+
+
+# Additional date/time functions
+class InTimezone(BinExp):
+    def do_run(self, dt_val, timezone_str, arg, scope):
+        import datetime
+
+        from .rtime import in_timezone
+
+        if not isinstance(dt_val, datetime.datetime):
+            raise TypeError("in_timezone() can only be called on datetime objects")
+
+        return in_timezone(dt_val, timezone_str)
+
+
+class Timezone(MonExp):
+    def do_run(self, dt_val, arg, scope):
+        import datetime
+
+        from .rtime import get_timezone
+
+        if not isinstance(dt_val, datetime.datetime):
+            raise TypeError("timezone() can only be called on datetime objects")
+
+        return get_timezone(dt_val)
+
+
+class DayOfYear(MonExp):
+    def do_run(self, dt_val, arg, scope):
+        import datetime
+
+        from .rtime import day_of_year
+
+        if not isinstance(dt_val, datetime.datetime):
+            raise TypeError("day_of_year() can only be called on datetime objects")
+
+        return day_of_year(dt_val)
+
+
+class ToIso8601(MonExp):
+    def do_run(self, dt_val, arg, scope):
+        import datetime
+
+        from .rtime import to_iso8601
+
+        if not isinstance(dt_val, datetime.datetime):
+            raise TypeError("to_iso8601() can only be called on datetime objects")
+
+        return to_iso8601(dt_val)
+
+
+# Bit shift operations
+class BitSal(BinExp):
+    """Bit shift left (arithmetic shift left)"""
+
+    def do_run(self, left_val, right_val, arg, scope):
+        if not isinstance(left_val, int) or not isinstance(right_val, int):
+            raise TypeError("bit_sal can only be applied to integers")
+
+        if right_val < 0:
+            raise ValueError("Shift amount must be non-negative")
+
+        return left_val << right_val
+
+
+class BitSar(BinExp):
+    """Bit shift right (arithmetic shift right)"""
+
+    def do_run(self, left_val, right_val, arg, scope):
+        if not isinstance(left_val, int) or not isinstance(right_val, int):
+            raise TypeError("bit_sar can only be applied to integers")
+
+        if right_val < 0:
+            raise ValueError("Shift amount must be non-negative")
+
+        return left_val >> right_val
+
+
+# JSON conversion functions
+class ToJsonString(MonExp):
+    def do_run(self, value, arg, scope):
+        import json
+
+        try:
+            return json.dumps(value, default=str)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Cannot convert to JSON: {e}")
+
+
+# Fold aggregation function
+class Fold(Ternary):
+    def do_run(self, sequence, base, fold_func, arg, scope):
+        if not hasattr(sequence, "__iter__"):
+            raise TypeError("fold() can only be applied to sequences")
+
+        accumulator = base
+        for item in sequence:
+            # The fold function takes (accumulator, current_item) as arguments
+            # Create a new function call with these arguments
+            fold_result = fold_func.do_call([accumulator, item], scope)
+            accumulator = fold_result
+
+        return accumulator

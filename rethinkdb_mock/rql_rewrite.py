@@ -195,6 +195,10 @@ NORMAL_MONOPS = {
     r_ast.Ceil: mt_ast.Ceil,
     r_ast.Floor: mt_ast.Floor,
     r_ast.BitNot: mt_ast.BitNot,
+    r_ast.Timezone: mt_ast.Timezone,
+    r_ast.DayOfYear: mt_ast.DayOfYear,
+    r_ast.ToISO8601: mt_ast.ToIso8601,
+    r_ast.ToJsonString: mt_ast.ToJsonString,
 }
 
 #   2-ary reql terms which don't need any special handling
@@ -216,6 +220,9 @@ NORMAL_BINOPS = {
     r_ast.BitAnd: mt_ast.BitAnd,
     r_ast.BitOr: mt_ast.BitOr,
     r_ast.BitXor: mt_ast.BitXor,
+    r_ast.BitSal: mt_ast.BitSal,
+    r_ast.BitSar: mt_ast.BitSar,
+    r_ast.InTimezone: mt_ast.InTimezone,
     r_ast.Bracket: mt_ast.Bracket,
     r_ast.Table: mt_ast.RTable,
     r_ast.Get: mt_ast.Get,
@@ -287,6 +294,7 @@ NORMAL_TERNOPS = {
     r_ast.IndexRename: mt_ast.IndexRename,
     r_ast.Between: mt_ast.Between,
     r_ast.During: mt_ast.During,
+    r_ast.Fold: mt_ast.Fold,
 }
 
 #   We can determine a lot about these functions' behavior based on arg count.
