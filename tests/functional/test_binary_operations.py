@@ -136,16 +136,30 @@ class TestBracketAccess(MockTest):
 
     def test_bracket_missing_fields(self, conn):
         """Test Bracket class behavior with missing fields"""
-        # Test accessing missing nested field (should return None)
+        # Test accessing missing nested field using has_fields and default
         result = list(
             r.db("test_db")
             .table("test")
-            .map(lambda doc: doc["info"].get_field("details").default(None))
+            .map(lambda doc: 
+                 r.branch(doc["info"].has_fields("details"),
+                          doc["info"]["details"]["age"],
+                          None))
             .run(conn)
         )
         # First 3 docs have details, last one doesn't
-        assertEqual(len([x for x in result if x is not None]), 3)
-        assertEqual(result[3], None)
+        assertEqual(result, [25, 30, 35, None])
+
+        # Test with bracket access on arrays that might be empty
+        result = list(
+            r.db("test_db")
+            .table("test")
+            .map(lambda doc: 
+                 r.branch(doc["values"].count() > 0,
+                          doc["values"][0],
+                          None))
+            .run(conn)
+        )
+        assertEqual(result, [10, 15, 5, None])
 
     def test_bracket_deep_nesting(self, conn):
         """Test Bracket class with deeply nested field access"""
