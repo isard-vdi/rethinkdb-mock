@@ -156,7 +156,10 @@ class Bracket(BinExp):
             return [row[thing_attr] for row in thing]
         else:
             # For everything else (documents, lists, etc.), just access the attribute/index
-            return thing[thing_attr]
+            if isinstance(thing, dict):
+                return thing.get(thing_attr, None)  # Return None for missing keys
+            else:
+                return thing[thing_attr]  # For arrays, still throw IndexError
 
 
 class Get(BinExp):
@@ -1162,10 +1165,9 @@ class ForEach(RBase):
 
 class RDefault(BinExp):
     def do_run(self, left, right, arg, scope):
-        result = self.left.run(arg, scope)
-        if result is None:
-            return self.right.run(arg, scope)
-        return result
+        if left is None:
+            return right
+        return left
 
 
 class RExpr(RBase):
@@ -1180,10 +1182,31 @@ class CoerceTo(BinExp):
     def do_run(self, left, right, arg, scope):
         res = self.left.run(arg, scope)
         rname = self.right.run(arg, scope)
-        if rname.upper() == "ARRAY":
+        target_type = rname.upper()
+
+        if target_type == "ARRAY":
             if isinstance(res, dict):
                 return list(res.items())
             return list(res)
+        elif target_type == "STRING":
+            return str(res)
+        elif target_type == "NUMBER":
+            if isinstance(res, str):
+                try:
+                    # Try int first, then float
+                    if "." in res:
+                        return float(res)
+                    else:
+                        return int(res)
+                except ValueError:
+                    raise ValueError(f"Cannot convert '{res}' to number")
+            return res
+        elif target_type == "OBJECT":
+            if isinstance(res, list):
+                # Convert array of pairs to object
+                if all(isinstance(item, list) and len(item) == 2 for item in res):
+                    return {k: v for k, v in res}
+            return res
         return res
 
 
