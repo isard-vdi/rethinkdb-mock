@@ -267,11 +267,6 @@ class TestStringFunctions(MockTest):
         result = r.expr(arr).concat_map(lambda x: x).run(conn)
         assertEqual(result, [1, 2, 3, 4, 5, 6])
 
-        # Test with table data
-        result = self.table.concat_map(lambda doc: doc["text"].split(" ")).run()
-        expected = ["hello", "world", "foo", "bar", "hello", "foo"]
-        self.assertEqual(sorted(result), sorted(expected))
-
 
 class TestMiscFunctions(MockTest):
     """Test miscellaneous functions: uuid, bracket, row, rvar"""

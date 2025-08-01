@@ -326,6 +326,39 @@ class Neq(BinOp):
 
 class Add(BinOp):
     binop = operator.add
+    
+    def __init__(self, left, right=None, optargs=None):
+        if right is None and isinstance(left, Args):
+            # This is r.add(r.args([...])) - store the Args node
+            self.args_node = left
+            self.is_args_expansion = True
+            # Initialize as RBase since we don't have left/right
+            RBase.__init__(self, optargs)
+        else:
+            # Normal binary add
+            self.is_args_expansion = False
+            super().__init__(left, right, optargs)
+    
+    def run(self, arg, scope):
+        if self.is_args_expansion:
+            # Expand the args array and sum all values
+            args_values = self.args_node.run(arg, scope)
+            return sum(args_values)
+        else:
+            # Normal binary operation
+            return super().run(arg, scope)
+
+
+class MultiAdd(RBase):
+    """Handle r.add(a, b, c, ...) with multiple arguments"""
+    
+    def __init__(self, args, optargs=None):
+        self.args = args
+        super().__init__(optargs)
+    
+    def run(self, arg, scope):
+        values = [a.run(arg, scope) if hasattr(a, 'run') else a for a in self.args]
+        return sum(values)
 
 
 class Sub(BinOp):
@@ -1772,3 +1805,24 @@ class GetWriteHook(MonExp):
 
         # For mock implementation, return null (no hook set)
         return None
+
+
+class Args(RBase):
+    """Expand an array into arguments for a function"""
+
+    def __init__(self, array_expr):
+        self.array_expr = array_expr
+
+    def run(self, arg, scope):
+        # Args is special - it's used to expand an array into function arguments
+        # The actual expansion is handled by the calling function (like Add)
+        # Here we just return the array values
+        if hasattr(self.array_expr, 'run'):
+            result = self.array_expr.run(arg, scope)
+        else:
+            result = self.array_expr
+        
+        if not isinstance(result, (list, tuple)):
+            raise TypeError("r.args() requires an array argument")
+        
+        return result

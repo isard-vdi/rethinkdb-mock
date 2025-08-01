@@ -216,7 +216,6 @@ NORMAL_BINOPS = {
     r_ast.Ne: mt_ast.Neq,
     r_ast.Gt: mt_ast.Gt,
     r_ast.Nth: mt_ast.Nth,
-    r_ast.Add: mt_ast.Add,
     r_ast.Sub: mt_ast.Sub,
     r_ast.Mul: mt_ast.Mul,
     r_ast.Div: mt_ast.Div,
@@ -619,3 +618,43 @@ def replace_implicit_vars(arg_symbol, node):
             node.optargs[key] = r_ast.Var(r_ast.Datum(arg_symbol))
         else:
             replace_implicit_vars(arg_symbol, node.optargs[key])
+
+
+@handles_type(r_ast.Args)
+def handle_args(node):
+    """Handle argument expansion"""
+    return mt_ast.Args(type_dispatch(node._args[0]))
+
+
+@handles_type(r_ast.Add)
+def handle_add(node):
+    """Handle addition with special support for r.args() expansion"""
+    if len(node._args) == 1:
+        # Check if the single argument is an Args node
+        arg = node._args[0]
+        if isinstance(arg, r_ast.Args):
+            # This is r.add(r.args([...])) - expand the args and create a multi-arg Add
+            return mt_ast.Add(type_dispatch(arg), optargs=process_optargs(node))
+        else:
+            # Single argument that's not Args - this shouldn't happen for Add
+            return mt_ast.Add(type_dispatch(arg), optargs=process_optargs(node))
+    elif len(node._args) == 2:
+        # Normal binary add
+        return mt_ast.Add(
+            type_dispatch(node._args[0]),
+            type_dispatch(node._args[1]),
+            optargs=process_optargs(node),
+        )
+    else:
+        # Multiple arguments - this is r.add(a, b, c, ...)
+        args = [type_dispatch(arg) for arg in node._args]
+        return mt_ast.MultiAdd(args, optargs=process_optargs(node))
+
+
+@handles_type(r_ast.ConcatMap)
+def handle_concat_map(node):
+    """Handle concat_map function"""
+    return mt_ast.ConcatMap(
+        type_dispatch(node._args[0]),  # sequence
+        type_dispatch(node._args[1])   # mapping function
+    )
