@@ -72,8 +72,8 @@ class TestLogicalOperators(MockTest):
             .filter(lambda doc: doc["premium"].or_(doc["score"] > 85))
             .run(conn)
         )
-        assertEqual(len(result), 3)
-        expected_ids = {2, 3, 1}  # premium: 2,3; score>85: 1,2
+        assertEqual(len(result), 2)
+        expected_ids = {2, 3}  # premium: 2,3; score>85: only 2 (92>85)
         actual_ids = {item["id"] for item in result}
         assertEqual(actual_ids, expected_ids)
 
