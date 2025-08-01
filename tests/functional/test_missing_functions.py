@@ -9,6 +9,10 @@ from rethinkdb import r
 from tests.common import as_db_and_table
 from tests.common import assertEqual
 from tests.common import assertEqUnordered
+from tests.common import assertNotEqual
+from tests.common import assertIsInstance
+from tests.common import assertIsNotNone
+from tests.common import assertIsNone
 from tests.functional.common import MockTest
 
 
@@ -179,16 +183,16 @@ class TestUtilityFunctions(MockTest):
         data = [{"id": 1, "value": 42}]
         return as_db_and_table("test_db", "test", data)
 
-    def test_args_function(self):
+    def test_args_function(self, conn):
         """Test r.args() for argument expansion"""
         # Test with array
         arr = [1, 2, 3]
-        result = self.r.add(self.r.args(arr)).run()
-        self.assertEqual(result, 6)
+        result = r.add(r.args(arr)).run(conn)
+        assertEqual(result, 6)
 
         # Test with expressions
-        result = self.r.expr([1, 2, 3]).do(lambda x: self.r.add(self.r.args(x))).run()
-        self.assertEqual(result, 6)
+        result = r.expr([1, 2, 3]).do(lambda x: r.add(r.args(x))).run(conn)
+        assertEqual(result, 6)
 
     def test_default_function(self, conn):
         """Test r.default() for default values"""
@@ -275,29 +279,27 @@ class TestMiscFunctions(MockTest):
     """Test miscellaneous functions: uuid, bracket, row, rvar"""
 
     def get_data(self):
-        data = {
-            "test": [
-                {"id": 1, "data": {"nested": "value1"}},
-                {"id": 2, "data": {"nested": "value2"}},
-            ]
-        }
-        return data
+        data = [
+            {"id": 1, "data": {"nested": "value1"}},
+            {"id": 2, "data": {"nested": "value2"}},
+        ]
+        return as_db_and_table("test_db", "test", data)
 
-    def test_uuid_function(self):
+    def test_uuid_function(self, conn):
         """Test r.uuid() for generating UUIDs"""
-        uuid1 = self.r.uuid().run()
-        uuid2 = self.r.uuid().run()
+        uuid1 = r.uuid().run(conn)
+        uuid2 = r.uuid().run(conn)
 
         # UUIDs should be strings
-        self.assertIsInstance(uuid1, str)
-        self.assertIsInstance(uuid2, str)
+        assertIsInstance(uuid1, str)
+        assertIsInstance(uuid2, str)
 
         # UUIDs should be different
-        self.assertNotEqual(uuid1, uuid2)
+        assertNotEqual(uuid1, uuid2)
 
         # UUIDs should have correct format (basic check)
-        self.assertEqual(len(uuid1), 36)
-        self.assertEqual(len(uuid2), 36)
+        assertEqual(len(uuid1), 36)
+        assertEqual(len(uuid2), 36)
 
     def test_bracket_function(self):
         """Test bracket notation for field access"""

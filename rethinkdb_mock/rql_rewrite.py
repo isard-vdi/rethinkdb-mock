@@ -557,6 +557,12 @@ def handle_for_each(node):
     )
 
 
+@handles_type(r_ast.UUID)
+def handle_uuid(node):
+    """Handle UUID generation"""
+    return mt_ast.Uuid()
+
+
 #   ImplicitVar handling.
 #   `ImplicitVar`s show up in ReQL expressions as `r.row`, e.g.:
 #       r.db('x').table('y').map(

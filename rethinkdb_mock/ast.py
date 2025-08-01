@@ -49,7 +49,7 @@ class RError1(MonExp):
 
 class Uuid(RBase):
     def run(self, arg, scope):
-        return uuid.uuid4()
+        return str(uuid.uuid4())
 
 
 class RDb(MonExp):

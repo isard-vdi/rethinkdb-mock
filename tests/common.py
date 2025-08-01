@@ -40,6 +40,22 @@ def assertEqual(x, y, msg=""):
     assert x == y
 
 
+def assertNotEqual(x, y, msg=""):
+    assert x != y
+
+
+def assertIsInstance(obj, class_or_tuple, msg=""):
+    assert isinstance(obj, class_or_tuple)
+
+
+def assertIsNotNone(obj, msg=""):
+    assert obj is not None
+
+
+def assertIsNone(obj, msg=""):
+    assert obj is None
+
+
 def as_db_and_table(db_name, table_name, data):
     return {"dbs": {db_name: {"tables": {table_name: data}}}}
 
