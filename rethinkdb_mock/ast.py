@@ -720,7 +720,27 @@ class OrderByFunc(ByFuncBase):
 
 class OrderByKeys(BinExp):
     def do_run(self, sequence, keys, arg, scope):
-        return util.sort_by_many(keys, sequence)
+        # Handle index-based ordering if an index is specified in optargs
+        if "index" in self.optargs:
+            index_name = self.optargs["index"]
+            # Get the index function
+            index_func, _ = self.find_index_func_for_scope(index_name, arg)
+            
+            if isinstance(index_func, RFunc):
+                def map_fn(d):
+                    return index_func.run([d], scope)
+            else:
+                map_fn = index_func
+            
+            # Create a list of (document, sort_key) tuples
+            tups = [(item, map_fn(item)) for item in sequence]
+            
+            # Sort by the index values
+            tups.sort(key=lambda x: tuple(x[1]) if isinstance(x[1], list) else x[1])
+            
+            return [item[0] for item in tups]
+        else:
+            return util.sort_by_many(keys, sequence)
 
 
 class Random0(RBase):
@@ -1043,6 +1063,39 @@ def operators_for_bounds(left_bound, right_bound):
     return left_oper, right_oper
 
 
+def safe_compare_arrays(arr1, arr2, comparison_func):
+    """Safely compare arrays that may contain infinity values"""
+    if not isinstance(arr1, list) or not isinstance(arr2, list):
+        return comparison_func(arr1, arr2)
+    
+    # Compare element by element
+    for i in range(min(len(arr1), len(arr2))):
+        val1, val2 = arr1[i], arr2[i]
+        
+        # Handle infinity values
+        if val1 == float('-inf'):
+            if val2 == float('-inf'):
+                continue  # Equal, check next element
+            else:
+                return comparison_func == operator.le or comparison_func == operator.lt
+        elif val1 == float('inf'):
+            if val2 == float('inf'):
+                continue  # Equal, check next element  
+            else:
+                return comparison_func == operator.ge or comparison_func == operator.gt
+        elif val2 == float('-inf'):
+            return comparison_func == operator.ge or comparison_func == operator.gt
+        elif val2 == float('inf'):
+            return comparison_func == operator.le or comparison_func == operator.lt
+        else:
+            # Regular comparison
+            if val1 != val2:
+                return comparison_func(val1, val2)
+    
+    # If all compared elements are equal, compare by length
+    return comparison_func(len(arr1), len(arr2))
+
+
 class Between(Ternary):
     def do_run(self, table, lower_key, upper_key, arg, scope):
         defaults = {"left_bound": "closed", "right_bound": "open", "index": "id"}
@@ -1051,14 +1104,20 @@ class Between(Ternary):
         if options["index"] == "id":
             map_fn = util.getter("id")
         else:
-            map_fn, _ = self.find_index_func_for_scope(options["index"], arg)
+            index_func, _ = self.find_index_func_for_scope(options["index"], arg)
+            
+            if isinstance(index_func, RFunc):
+                def map_fn(d):
+                    return index_func.run([d], scope)
+            else:
+                map_fn = index_func
 
         left_test, right_test = operators_for_bounds(
             options["left_bound"], options["right_bound"]
         )
         for document in table:
             doc_val = map_fn(document)
-            if left_test(doc_val, lower_key) and right_test(doc_val, upper_key):
+            if safe_compare_arrays(doc_val, lower_key, left_test) and safe_compare_arrays(doc_val, upper_key, right_test):
                 yield document
 
 

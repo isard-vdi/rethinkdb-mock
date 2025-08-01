@@ -1,5 +1,6 @@
 from future.utils import iteritems
 import rethinkdb.ast as r_ast
+import rethinkdb.query as r_query
 
 from rethinkdb_mock import ast as mt_ast
 from rethinkdb_mock import ast_base
@@ -495,6 +496,62 @@ def handle_contains(node):
         return mt_ast.ContainsFuncs(sequence, rest, optargs=optargs)
     else:
         return mt_ast.ContainsElems(sequence, rest, optargs=optargs)
+
+
+# Additional RQL type handlers for missing functionality
+
+@handles_type(r_query.RqlConstant)
+def handle_rql_constant(node):
+    """Handle RQL constants like r.minval and r.maxval"""
+    # RqlConstant term types: 180 = MINVAL, 181 = MAXVAL (based on ReQL spec)
+    if node.term_type == 180:  # MINVAL
+        return ast_base.RDatum(float('-inf'))
+    elif node.term_type == 181:  # MAXVAL
+        return ast_base.RDatum(float('inf'))
+    else:
+        # For other constants, return a generic marker
+        return ast_base.RDatum(f"CONSTANT_{node.term_type}")
+
+
+@handles_type(r_ast.Slice)
+def handle_slice(node):
+    """Handle array/sequence slicing"""
+    return mt_ast.Slice(
+        type_dispatch(node._args[0]),  # sequence
+        type_dispatch(node._args[1]),  # start index
+        type_dispatch(node._args[2]) if len(node._args) > 2 else None,  # end index
+        optargs=process_optargs(node)
+    )
+
+
+@handles_type(r_ast.Skip)
+def handle_skip(node):
+    """Handle skip operation for sequences"""
+    return mt_ast.Skip(
+        type_dispatch(node._args[0]),  # sequence
+        type_dispatch(node._args[1]),  # count to skip
+        optargs=process_optargs(node)
+    )
+
+
+@handles_type(r_ast.Difference)
+def handle_difference(node):
+    """Handle array difference operation"""
+    return mt_ast.Difference(
+        type_dispatch(node._args[0]),  # left array
+        type_dispatch(node._args[1]),  # right array  
+        optargs=process_optargs(node)
+    )
+
+
+@handles_type(r_ast.ForEach)
+def handle_for_each(node):
+    """Handle for_each operation"""
+    return mt_ast.ForEach(
+        type_dispatch(node._args[0]),  # sequence
+        type_dispatch(node._args[1]),  # function
+        optargs=process_optargs(node)
+    )
 
 
 #   ImplicitVar handling.
