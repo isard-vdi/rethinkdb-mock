@@ -191,10 +191,31 @@ class GetAll(BinExp):
             else:
                 search_keys = right
                 
+            # For compound indexes, we need to handle the case where search_keys is a single compound key
+            # vs multiple separate keys. If search_keys is a list of non-list items, and we're dealing with
+            # a compound index, then search_keys might be a single compound key
+            if is_multi and isinstance(search_keys, list) and len(search_keys) > 0:
+                # Check if this looks like a single compound key vs multiple simple keys
+                # If all elements are simple (not lists), and we get no matches treating them as separate keys,
+                # we should try treating the whole thing as a single compound key
+                first_elem_index_value = None
+                if len(left) > 0:
+                    first_elem_index_value = map_fn(left[0])
+                    
+                # If the index produces compound values (lists), and our search_keys is a list of simple values,
+                # treat search_keys as a single compound key
+                if (first_elem_index_value and isinstance(first_elem_index_value, list) and 
+                    len(first_elem_index_value) > 0 and isinstance(first_elem_index_value[0], list) and
+                    not any(isinstance(key, list) for key in search_keys)):
+                    # This looks like a single compound key
+                    search_keys = [search_keys]
+                
             if is_multi:
-                seen_ids = set([])
+                # For multi-indexes, each document can appear multiple times
+                # if it matches multiple search keys
                 for elem in left:
                     indexed = map_fn(elem)
+                    
                     if not isinstance(indexed, (tuple, list)):
                         indexed = [indexed]
                     
@@ -207,6 +228,7 @@ class GetAll(BinExp):
                             indexed_hashable.append(item)
                     indexed_set = set(indexed_hashable)
                     
+                    # Check each search key separately - document can match multiple times
                     for match_item in search_keys:
                         # Convert match_item to tuple if it's a list for comparison
                         if isinstance(match_item, list):
@@ -215,10 +237,7 @@ class GetAll(BinExp):
                             match_item_comparable = match_item
                             
                         if match_item_comparable in indexed_set:
-                            if elem["id"] not in seen_ids:
-                                seen_ids.add(elem["id"])
-                                result.append(elem)
-                            break
+                            result.append(elem)  # Allow duplicates for multi-index
             else:
                 for elem in left:
                     elem_index_value = map_fn(elem)
