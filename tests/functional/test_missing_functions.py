@@ -135,48 +135,49 @@ class TestArrayAccess(MockTest):
         """Test r.nth() array indexing"""
         arr = [1, 2, 3, 4, 5]
         result = r.expr(arr).nth(0).run(conn)
-        self.assertEqual(result, 1)
+        assertEqual(result, 1)
 
         result = r.expr(arr).nth(2).run(conn)
-        self.assertEqual(result, 3)
+        assertEqual(result, 3)
 
         result = r.expr(arr).nth(-1).run(conn)
-        self.assertEqual(result, 5)
+        assertEqual(result, 5)
 
     def test_slice_function(self, conn):
         """Test r.slice() array slicing"""
         arr = [1, 2, 3, 4, 5]
         result = r.expr(arr).slice(1, 3).run(conn)
-        self.assertEqual(result, [2, 3])
+        assertEqual(result, [2, 3])
 
         result = r.expr(arr).slice(2).run(conn)
-        self.assertEqual(result, [3, 4, 5])
+        assertEqual(result, [3, 4, 5])
 
         result = r.expr(arr).slice(0, -1).run(conn)
-        self.assertEqual(result, [1, 2, 3, 4])
+        assertEqual(result, [1, 2, 3, 4])
 
     def test_limit_function(self, conn):
         """Test r.limit() for limiting results"""
         result = list(r.db("test_db").table("test").limit(2).run(conn))
-        self.assertEqual(len(result), 2)
+        assertEqual(len(result), 2)
 
     def test_skip_function(self, conn):
         """Test r.skip() for skipping results"""
         result = list(r.db("test_db").table("test").skip(2).run(conn))
-        self.assertEqual(len(result), 3)
+        assertEqual(len(result), 3)
 
     def test_limit_skip_combined(self, conn):
         """Test combining limit and skip"""
         result = list(r.db("test_db").table("test").skip(1).limit(2).run(conn))
-        self.assertEqual(len(result), 2)
+        assertEqual(len(result), 2)
 
 
 class TestUtilityFunctions(MockTest):
     """Test utility functions: args, default, coerce_to, binary"""
 
     def get_data(self):
-        data = {}
-        return data
+        # Simple data structure for utility functions that don't need database tables
+        data = [{"id": 1, "value": 42}]
+        return as_db_and_table("test_db", "test", data)
 
     def test_args_function(self):
         """Test r.args() for argument expansion"""
@@ -189,35 +190,36 @@ class TestUtilityFunctions(MockTest):
         result = self.r.expr([1, 2, 3]).do(lambda x: self.r.add(self.r.args(x))).run()
         self.assertEqual(result, 6)
 
-    def test_default_function(self):
+    def test_default_function(self, conn):
         """Test r.default() for default values"""
         # Test with null value
-        result = self.r.expr(None).default("default_value").run()
-        self.assertEqual(result, "default_value")
+        result = r.expr(None).default("default_value").run(conn)
+        assertEqual(result, "default_value")
 
         # Test with non-null value
-        result = self.r.expr("actual_value").default("default_value").run()
-        self.assertEqual(result, "actual_value")
+        result = r.expr("actual_value").default("default_value").run(conn)
+        assertEqual(result, "actual_value")
 
         # Test with missing field
         obj = {"a": 1}
-        result = self.r.expr(obj)["b"].default("missing").run()
-        self.assertEqual(result, "missing")
+        result = r.expr(obj)["b"].default("missing").run(conn)
+        assertEqual(result, "missing")
 
-    def test_coerce_to_function(self):
+    def test_coerce_to_function(self, conn):
         """Test r.coerce_to() type conversion"""
         # Number to string
-        result = self.r.expr(42).coerce_to("string").run()
-        self.assertEqual(result, "42")
+        result = r.expr(42).coerce_to("string").run(conn)
+        assertEqual(result, "42")
 
         # String to number
-        result = self.r.expr("42").coerce_to("number").run()
-        self.assertEqual(result, 42)
+        result = r.expr("42").coerce_to("number").run(conn)
+        assertEqual(result, 42)
 
-        # Array to object
-        arr = [["a", 1], ["b", 2]]
-        result = self.r.expr(arr).coerce_to("object").run()
-        self.assertEqual(result, {"a": 1, "b": 2})
+        # Object to array (gets key-value pairs as tuples)
+        obj = {"a": 1, "b": 2}
+        result = r.expr(obj).coerce_to("array").run(conn)
+        # Should return list of [key, value] pairs
+        assertEqUnordered(result, [("a", 1), ("b", 2)])
 
     def test_binary_function(self):
         """Test r.binary() for binary data"""

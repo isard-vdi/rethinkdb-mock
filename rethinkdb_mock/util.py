@@ -375,7 +375,7 @@ def rql_str_split(string, split_on, limit=-1):
 
 def sort_by_one(sort_key, sequence, reverse=False):
     out = clone_array(sequence)
-    
+
     def safe_key(doc):
         value = getter(sort_key, doc)
         # Handle None values by converting to tuple for proper sorting
@@ -385,7 +385,7 @@ def sort_by_one(sort_key, sequence, reverse=False):
         elif isinstance(value, list):
             return (1, tuple(value))  # Arrays come after None
         return (1, value)  # Other values come after None
-    
+
     kwargs = {"key": safe_key}
     if reverse:
         kwargs["reverse"] = True

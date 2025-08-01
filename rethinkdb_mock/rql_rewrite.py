@@ -500,14 +500,15 @@ def handle_contains(node):
 
 # Additional RQL type handlers for missing functionality
 
+
 @handles_type(r_query.RqlConstant)
 def handle_rql_constant(node):
     """Handle RQL constants like r.minval and r.maxval"""
     # RqlConstant term types: 180 = MINVAL, 181 = MAXVAL (based on ReQL spec)
     if node.term_type == 180:  # MINVAL
-        return ast_base.RDatum(float('-inf'))
+        return ast_base.RDatum(float("-inf"))
     elif node.term_type == 181:  # MAXVAL
-        return ast_base.RDatum(float('inf'))
+        return ast_base.RDatum(float("inf"))
     else:
         # For other constants, return a generic marker
         return ast_base.RDatum(f"CONSTANT_{node.term_type}")
@@ -516,10 +517,13 @@ def handle_rql_constant(node):
 @handles_type(r_ast.Slice)
 def handle_slice(node):
     """Handle array/sequence slicing"""
+    # Package start and end as simple values for BinExp structure  
+    start = type_dispatch(node._args[1])
+    end = type_dispatch(node._args[2]) if len(node._args) > 2 else ast_base.RDatum(None)
+    indices = mt_ast.MakeArray([start, end])
     return mt_ast.Slice(
         type_dispatch(node._args[0]),  # sequence
-        type_dispatch(node._args[1]),  # start index
-        type_dispatch(node._args[2]) if len(node._args) > 2 else None,  # end index
+        indices,  # indices as array
         optargs=process_optargs(node)
     )
 
@@ -539,8 +543,8 @@ def handle_difference(node):
     """Handle array difference operation"""
     return mt_ast.Difference(
         type_dispatch(node._args[0]),  # left array
-        type_dispatch(node._args[1]),  # right array  
-        optargs=process_optargs(node)
+        type_dispatch(node._args[1]),  # right array
+        optargs=process_optargs(node),
     )
 
 
@@ -550,7 +554,6 @@ def handle_for_each(node):
     return mt_ast.ForEach(
         type_dispatch(node._args[0]),  # sequence
         type_dispatch(node._args[1]),  # function
-        optargs=process_optargs(node)
     )
 
 

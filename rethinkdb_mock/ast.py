@@ -173,7 +173,7 @@ class GetAll(BinExp):
             index_func, is_multi = self.find_index_func_for_scope(
                 self.optargs["index"], arg
             )
-            
+
             if isinstance(index_func, RFunc):
 
                 def map_fn(d):
@@ -184,13 +184,13 @@ class GetAll(BinExp):
 
             result = []
             left = list(left)
-            
+
             # Evaluate right if it's an AST node
-            if hasattr(right, 'run'):
+            if hasattr(right, "run"):
                 search_keys = right.run([], scope)
             else:
                 search_keys = right
-                
+
             # For compound indexes, we need to handle the case where search_keys is a single compound key
             # vs multiple separate keys. If search_keys is a list of non-list items, and we're dealing with
             # a compound index, then search_keys might be a single compound key
@@ -201,24 +201,28 @@ class GetAll(BinExp):
                 first_elem_index_value = None
                 if len(left) > 0:
                     first_elem_index_value = map_fn(left[0])
-                    
+
                 # If the index produces compound values (lists), and our search_keys is a list of simple values,
                 # treat search_keys as a single compound key
-                if (first_elem_index_value and isinstance(first_elem_index_value, list) and 
-                    len(first_elem_index_value) > 0 and isinstance(first_elem_index_value[0], list) and
-                    not any(isinstance(key, list) for key in search_keys)):
+                if (
+                    first_elem_index_value
+                    and isinstance(first_elem_index_value, list)
+                    and len(first_elem_index_value) > 0
+                    and isinstance(first_elem_index_value[0], list)
+                    and not any(isinstance(key, list) for key in search_keys)
+                ):
                     # This looks like a single compound key
                     search_keys = [search_keys]
-                
+
             if is_multi:
                 # For multi-indexes, each document can appear multiple times
                 # if it matches multiple search keys
                 for elem in left:
                     indexed = map_fn(elem)
-                    
+
                     if not isinstance(indexed, (tuple, list)):
                         indexed = [indexed]
-                    
+
                     # Convert lists to tuples for hashability when using sets
                     indexed_hashable = []
                     for item in indexed:
@@ -227,7 +231,7 @@ class GetAll(BinExp):
                         else:
                             indexed_hashable.append(item)
                     indexed_set = set(indexed_hashable)
-                    
+
                     # Check each search key separately - document can match multiple times
                     for match_item in search_keys:
                         # Convert match_item to tuple if it's a list for comparison
@@ -235,25 +239,30 @@ class GetAll(BinExp):
                             match_item_comparable = tuple(match_item)
                         else:
                             match_item_comparable = match_item
-                            
+
                         if match_item_comparable in indexed_set:
                             result.append(elem)  # Allow duplicates for multi-index
             else:
                 for elem in left:
                     elem_index_value = map_fn(elem)
-                    
+
                     # Check if elem_index_value matches any of the search keys
                     matched = False
-                    
+
                     # Handle compound indexes (arrays) specially
                     if isinstance(elem_index_value, (list, tuple)):
                         # If we have a single search key that's an array (compound index query)
-                        if len(search_keys) > 0 and isinstance(search_keys[0], (list, tuple)):
+                        if len(search_keys) > 0 and isinstance(
+                            search_keys[0], (list, tuple)
+                        ):
                             # Multiple compound keys to search for
                             for search_value in search_keys:
                                 if isinstance(search_value, (list, tuple)):
-                                    if len(elem_index_value) == len(search_value) and all(
-                                        a == b for a, b in zip(elem_index_value, search_value)
+                                    if len(elem_index_value) == len(
+                                        search_value
+                                    ) and all(
+                                        a == b
+                                        for a, b in zip(elem_index_value, search_value)
                                     ):
                                         matched = True
                                         break
@@ -269,14 +278,14 @@ class GetAll(BinExp):
                             if elem_index_value == search_value:
                                 matched = True
                                 break
-                    
+
                     if matched:
                         result.append(elem)
             return result
 
         else:
             # Handle non-indexed queries (regular ID-based get_all)
-            if hasattr(right, 'run'):
+            if hasattr(right, "run"):
                 search_keys = right.run([], scope)
             else:
                 search_keys = right
@@ -621,7 +630,15 @@ class Limit(BinExp):
 
 class Slice(BinExp):
     def do_run(self, sequence, indices, arg, scope):
-        start, end = indices
+        # indices is now an RDatum containing [start, end] or [start]
+        if hasattr(indices, 'run'):
+            indices_list = indices.run(arg, scope)
+        else:
+            indices_list = indices
+            
+        start = indices_list[0] if len(indices_list) > 0 else 0
+        end = indices_list[1] if len(indices_list) > 1 else None
+        
         return util.slice_with(start, end)(sequence)
 
 
@@ -744,19 +761,21 @@ class OrderByKeys(BinExp):
             index_name = self.optargs["index"]
             # Get the index function
             index_func, _ = self.find_index_func_for_scope(index_name, arg)
-            
+
             if isinstance(index_func, RFunc):
+
                 def map_fn(d):
                     return index_func.run([d], scope)
+
             else:
                 map_fn = index_func
-            
+
             # Create a list of (document, sort_key) tuples
             tups = [(item, map_fn(item)) for item in sequence]
-            
+
             # Sort by the index values
             tups.sort(key=lambda x: tuple(x[1]) if isinstance(x[1], list) else x[1])
-            
+
             return [item[0] for item in tups]
         else:
             return util.sort_by_many(keys, sequence)
@@ -854,9 +873,11 @@ class Branch(RBase):
 class Difference(BinExp):
     def do_run(self, sequence, to_remove, arg, scope):
         to_remove = set(to_remove)
+        result = []
         for elem in sequence:
             if elem not in to_remove:
-                yield elem
+                result.append(elem)
+        return result
 
 
 class ContainsElems(BinExp):
@@ -1086,31 +1107,31 @@ def safe_compare_arrays(arr1, arr2, comparison_func):
     """Safely compare arrays that may contain infinity values"""
     if not isinstance(arr1, list) or not isinstance(arr2, list):
         return comparison_func(arr1, arr2)
-    
+
     # Compare element by element
     for i in range(min(len(arr1), len(arr2))):
         val1, val2 = arr1[i], arr2[i]
-        
+
         # Handle infinity values
-        if val1 == float('-inf'):
-            if val2 == float('-inf'):
+        if val1 == float("-inf"):
+            if val2 == float("-inf"):
                 continue  # Equal, check next element
             else:
                 return comparison_func == operator.le or comparison_func == operator.lt
-        elif val1 == float('inf'):
-            if val2 == float('inf'):
-                continue  # Equal, check next element  
+        elif val1 == float("inf"):
+            if val2 == float("inf"):
+                continue  # Equal, check next element
             else:
                 return comparison_func == operator.ge or comparison_func == operator.gt
-        elif val2 == float('-inf'):
+        elif val2 == float("-inf"):
             return comparison_func == operator.ge or comparison_func == operator.gt
-        elif val2 == float('inf'):
+        elif val2 == float("inf"):
             return comparison_func == operator.le or comparison_func == operator.lt
         else:
             # Regular comparison
             if val1 != val2:
                 return comparison_func(val1, val2)
-    
+
     # If all compared elements are equal, compare by length
     return comparison_func(len(arr1), len(arr2))
 
@@ -1124,10 +1145,12 @@ class Between(Ternary):
             map_fn = util.getter("id")
         else:
             index_func, _ = self.find_index_func_for_scope(options["index"], arg)
-            
+
             if isinstance(index_func, RFunc):
+
                 def map_fn(d):
                     return index_func.run([d], scope)
+
             else:
                 map_fn = index_func
 
@@ -1136,7 +1159,9 @@ class Between(Ternary):
         )
         for document in table:
             doc_val = map_fn(document)
-            if safe_compare_arrays(doc_val, lower_key, left_test) and safe_compare_arrays(doc_val, upper_key, right_test):
+            if safe_compare_arrays(
+                doc_val, lower_key, left_test
+            ) and safe_compare_arrays(doc_val, upper_key, right_test):
                 yield document
 
 
@@ -1296,7 +1321,25 @@ class Binary(RBase):
 
 
 class ForEach(RBase):
-    pass
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def run(self, arg, scope=None):
+        sequence = self.left.run(arg, scope)
+        result = []
+        
+        for item in sequence:
+            # Apply the function to each item
+            function_result = self.right.run(item, scope)
+            
+            # Flatten the result - if it's a list/sequence, extend; otherwise append
+            if isinstance(function_result, (list, tuple)):
+                result.extend(function_result)
+            else:
+                result.append(function_result)
+        
+        return result
 
 
 class RDefault(BinExp):
