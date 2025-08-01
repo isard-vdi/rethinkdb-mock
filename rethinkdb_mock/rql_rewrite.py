@@ -658,3 +658,20 @@ def handle_concat_map(node):
         type_dispatch(node._args[0]),  # sequence
         type_dispatch(node._args[1])   # mapping function
     )
+
+
+@handles_type(r_ast.WithFields)
+def handle_with_fields(node):
+    """Handle with_fields function"""
+    # WithFields can take multiple field names as arguments
+    sequence = type_dispatch(node._args[0])
+    
+    # For multiple arguments, create a custom WithFields that can handle them
+    if len(node._args) > 2:
+        # Multiple field arguments: with_fields("name", "age")
+        field_names = [type_dispatch(arg) for arg in node._args[1:]]
+        return mt_ast.WithFieldsMulti(sequence, field_names, optargs=process_optargs(node))
+    else:
+        # Single field argument: with_fields("name") or with_fields(["name", "age"])
+        field_names = type_dispatch(node._args[1])
+        return mt_ast.WithFields(sequence, field_names, optargs=process_optargs(node))

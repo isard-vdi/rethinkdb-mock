@@ -9,6 +9,7 @@ from future.utils import iteritems
 from future.utils import text_type
 from past.utils import old_div
 from rethinkdb.errors import ReqlNonExistenceError
+from rethinkdb.errors import RqlRuntimeError
 
 from rethinkdb_mock import ast_base
 from rethinkdb_mock import joins
@@ -157,7 +158,11 @@ class Bracket(BinExp):
         else:
             # For everything else (documents, lists, etc.), just access the attribute/index
             if isinstance(thing, dict):
-                return thing.get(thing_attr, None)  # Return None for missing keys
+                if thing_attr in thing:
+                    return thing[thing_attr]
+                else:
+                    # RethinkDB raises an error for missing fields on single documents
+                    raise RqlRuntimeError(f"No attribute `{thing_attr}` in object")
             else:
                 return thing[thing_attr]  # For arrays, still throw IndexError
 
@@ -643,7 +648,73 @@ class HasFields(BinExp):
 
 class WithFields(BinExp):
     def do_run(self, sequence, keys, arg, scope):
-        return [elem for elem in sequence if util.has_attrs(keys, elem)]
+        # WithFields should select only the specified fields from each document
+        # keys might be a single field name, a list of field names, or individual arguments
+        
+        # If keys is a list of AST nodes (from multiple arguments), evaluate them
+        if isinstance(keys, list) and all(hasattr(k, 'run') for k in keys):
+            key_list = [k.run(arg, scope) for k in keys]
+        elif hasattr(keys, 'run'):
+            # Single AST node
+            evaluated_keys = keys.run(arg, scope)
+            if isinstance(evaluated_keys, str):
+                key_list = [evaluated_keys]
+            elif isinstance(evaluated_keys, list):
+                key_list = evaluated_keys
+            else:
+                key_list = [evaluated_keys]
+        elif isinstance(keys, str):
+            key_list = [keys]
+        elif isinstance(keys, list):
+            key_list = keys
+        else:
+            key_list = [keys]
+        
+        result = []
+        for elem in sequence:
+            if isinstance(elem, dict):
+                # Create a new dict with only the specified fields
+                filtered_elem = {k: elem[k] for k in key_list if k in elem}
+                result.append(filtered_elem)
+            else:
+                # If not a dict, can't select fields
+                result.append(elem)
+        
+        return result
+
+
+class WithFieldsMulti(RBase):
+    """Handle with_fields with multiple field arguments"""
+    
+    def __init__(self, sequence, field_args, optargs=None):
+        self.sequence = sequence
+        self.field_args = field_args  # List of RQL field name nodes
+        super().__init__(optargs)
+    
+    def run(self, arg, scope):
+        # Get the sequence
+        sequence_data = self.sequence.run(arg, scope)
+        
+        # Evaluate each field name
+        field_names = []
+        for field_node in self.field_args:
+            if hasattr(field_node, 'run'):
+                field_names.append(field_node.run(arg, scope))
+            else:
+                field_names.append(field_node)
+        
+        # Apply field selection
+        result = []
+        for elem in sequence_data:
+            if isinstance(elem, dict):
+                # Create a new dict with only the specified fields
+                filtered_elem = {k: elem[k] for k in field_names if k in elem}
+                result.append(filtered_elem)
+            else:
+                # If not a dict, can't select fields
+                result.append(elem)
+        
+        return result
 
 
 class ConcatMap(ByFuncBase):
@@ -1421,10 +1492,16 @@ class ForEach(RBase):
 
 
 class RDefault(BinExp):
-    def do_run(self, left, right, arg, scope):
-        if left is None:
-            return right
-        return left
+    def run(self, arg, scope):
+        # Default needs to catch errors from the left side and return the right side value
+        try:
+            left_result = self.left.run(arg, scope)
+            if left_result is None:
+                return self.right.run(arg, scope)
+            return left_result
+        except (RqlRuntimeError, ReqlNonExistenceError):
+            # If there's an error accessing the left side (e.g., missing field), return default
+            return self.right.run(arg, scope)
 
 
 class RExpr(RBase):

@@ -56,6 +56,14 @@ def assertIsNone(obj, msg=""):
     assert obj is None
 
 
+def assertIn(item, container, msg=""):
+    assert item in container
+
+
+def assertNotIn(item, container, msg=""):
+    assert item not in container
+
+
 def as_db_and_table(db_name, table_name, data):
     return {"dbs": {db_name: {"tables": {table_name: data}}}}
 
