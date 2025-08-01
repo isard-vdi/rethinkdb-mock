@@ -563,6 +563,30 @@ def handle_uuid(node):
     return mt_ast.Uuid()
 
 
+@handles_type(r_ast.Binary)
+def handle_binary(node):
+    """Handle binary data creation"""
+    # RethinkDB Binary objects store data in base64_data attribute
+    if hasattr(node, 'base64_data'):
+        import base64
+        binary_data = base64.b64decode(node.base64_data)
+        return mt_ast.Binary(binary_data)
+    elif hasattr(node, '_args') and node._args:
+        return mt_ast.Binary(type_dispatch(node._args[0]))
+    else:
+        return mt_ast.Binary(None)
+
+
+@handles_type(r_ast.Match)
+def handle_match(node):
+    """Handle string regex matching"""
+    return mt_ast.StrMatch(
+        type_dispatch(node._args[0]),  # string
+        type_dispatch(node._args[1]),  # pattern
+        optargs=process_optargs(node),
+    )
+
+
 #   ImplicitVar handling.
 #   `ImplicitVar`s show up in ReQL expressions as `r.row`, e.g.:
 #       r.db('x').table('y').map(

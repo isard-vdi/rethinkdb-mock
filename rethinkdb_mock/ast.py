@@ -1308,8 +1308,36 @@ class During(Ternary):
         return left_test(to_test, left) and right_test(to_test, right)
 
 
-class StrMatch(RBase):
-    pass
+class StrMatch(BinExp):
+    def do_run(self, string, pattern, arg, scope):
+        import re
+        
+        try:
+            match = re.search(pattern, string)
+            if match:
+                result = {
+                    "str": match.group(0),
+                    "start": match.start(),
+                    "end": match.end(),
+                    "groups": []
+                }
+                
+                # Add captured groups
+                for i, group in enumerate(match.groups()):
+                    group_info = {
+                        "str": group if group is not None else None,
+                        "start": match.start(i + 1) if group is not None else -1,
+                        "end": match.end(i + 1) if group is not None else -1
+                    }
+                    result["groups"].append(group_info)
+                
+                return result
+            else:
+                return None
+        except re.error:
+            # Invalid regex pattern
+            self.raise_rql_runtime_error(f"Invalid regular expression: {pattern}")
+            return None
 
 
 class Args(RBase):
@@ -1317,7 +1345,24 @@ class Args(RBase):
 
 
 class Binary(RBase):
-    pass
+    def __init__(self, data):
+        self.data = data
+    
+    def run(self, arg, scope):
+        if self.data is None:
+            return b""
+        if hasattr(self.data, 'run'):
+            result = self.data.run(arg, scope)
+        else:
+            result = self.data
+        
+        # Convert to bytes if it's not already
+        if isinstance(result, bytes):
+            return result
+        elif isinstance(result, str):
+            return result.encode('utf-8')
+        else:
+            return bytes(result)
 
 
 class ForEach(RBase):

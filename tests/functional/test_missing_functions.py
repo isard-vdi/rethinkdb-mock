@@ -225,49 +225,47 @@ class TestUtilityFunctions(MockTest):
         # Should return list of [key, value] pairs
         assertEqUnordered(result, [("a", 1), ("b", 2)])
 
-    def test_binary_function(self):
+    def test_binary_function(self, conn):
         """Test r.binary() for binary data"""
         # Create binary data
-        binary_data = self.r.binary(b"hello world").run()
-        self.assertIsInstance(binary_data, bytes)
-        self.assertEqual(binary_data, b"hello world")
+        binary_data = r.binary(b"hello world").run(conn)
+        assertIsInstance(binary_data, bytes)
+        assertEqual(binary_data, b"hello world")
 
 
 class TestStringFunctions(MockTest):
     """Test string functions: match, concat_map"""
 
     def get_data(self):
-        data = {
-            "test": [
-                {"text": "hello world"},
-                {"text": "foo bar"},
-                {"text": "hello foo"},
-            ]
-        }
-        return data
+        data = [
+            {"text": "hello world"},
+            {"text": "foo bar"},
+            {"text": "hello foo"},
+        ]
+        return as_db_and_table("test_db", "test", data)
 
-    def test_match_function(self):
+    def test_match_function(self, conn):
         """Test r.match() regex matching"""
         # Basic regex match
-        result = self.r.expr("hello world").match("hello").run()
-        self.assertIsNotNone(result)
-        self.assertEqual(result["str"], "hello")
+        result = r.expr("hello world").match("hello").run(conn)
+        assertIsNotNone(result)
+        assertEqual(result["str"], "hello")
 
         # No match
-        result = self.r.expr("hello world").match("xyz").run()
-        self.assertIsNone(result)
+        result = r.expr("hello world").match("xyz").run(conn)
+        assertIsNone(result)
 
         # Match with groups
-        result = self.r.expr("hello 123").match(r"(\w+) (\d+)").run()
-        self.assertIsNotNone(result)
-        self.assertEqual(result["str"], "hello 123")
+        result = r.expr("hello 123").match(r"(\w+) (\d+)").run(conn)
+        assertIsNotNone(result)
+        assertEqual(result["str"], "hello 123")
 
-    def test_concat_map_function(self):
+    def test_concat_map_function(self, conn):
         """Test r.concat_map() for flattening mapped results"""
         # Test with array transformation
         arr = [[1, 2], [3, 4], [5, 6]]
-        result = self.r.expr(arr).concat_map(lambda x: x).run()
-        self.assertEqual(result, [1, 2, 3, 4, 5, 6])
+        result = r.expr(arr).concat_map(lambda x: x).run(conn)
+        assertEqual(result, [1, 2, 3, 4, 5, 6])
 
         # Test with table data
         result = self.table.concat_map(lambda doc: doc["text"].split(" ")).run()
