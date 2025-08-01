@@ -173,6 +173,7 @@ class GetAll(BinExp):
             index_func, is_multi = self.find_index_func_for_scope(
                 self.optargs["index"], arg
             )
+            
             if isinstance(index_func, RFunc):
 
                 def map_fn(d):
@@ -183,27 +184,84 @@ class GetAll(BinExp):
 
             result = []
             left = list(left)
+            
+            # Evaluate right if it's an AST node
+            if hasattr(right, 'run'):
+                search_keys = right.run([], scope)
+            else:
+                search_keys = right
+                
             if is_multi:
                 seen_ids = set([])
                 for elem in left:
                     indexed = map_fn(elem)
                     if not isinstance(indexed, (tuple, list)):
                         indexed = [indexed]
-                    indexed = set(indexed)
-                    for match_item in right:
-                        if match_item in indexed:
+                    
+                    # Convert lists to tuples for hashability when using sets
+                    indexed_hashable = []
+                    for item in indexed:
+                        if isinstance(item, list):
+                            indexed_hashable.append(tuple(item))
+                        else:
+                            indexed_hashable.append(item)
+                    indexed_set = set(indexed_hashable)
+                    
+                    for match_item in search_keys:
+                        # Convert match_item to tuple if it's a list for comparison
+                        if isinstance(match_item, list):
+                            match_item_comparable = tuple(match_item)
+                        else:
+                            match_item_comparable = match_item
+                            
+                        if match_item_comparable in indexed_set:
                             if elem["id"] not in seen_ids:
                                 seen_ids.add(elem["id"])
                                 result.append(elem)
                             break
             else:
                 for elem in left:
-                    if map_fn(elem) in right:
+                    elem_index_value = map_fn(elem)
+                    
+                    # Check if elem_index_value matches any of the search keys
+                    matched = False
+                    
+                    # Handle compound indexes (arrays) specially
+                    if isinstance(elem_index_value, (list, tuple)):
+                        # If we have a single search key that's an array (compound index query)
+                        if len(search_keys) > 0 and isinstance(search_keys[0], (list, tuple)):
+                            # Multiple compound keys to search for
+                            for search_value in search_keys:
+                                if isinstance(search_value, (list, tuple)):
+                                    if len(elem_index_value) == len(search_value) and all(
+                                        a == b for a, b in zip(elem_index_value, search_value)
+                                    ):
+                                        matched = True
+                                        break
+                        else:
+                            # search_keys might be the compound key itself
+                            if len(elem_index_value) == len(search_keys) and all(
+                                a == b for a, b in zip(elem_index_value, search_keys)
+                            ):
+                                matched = True
+                    else:
+                        # Simple value comparison for non-compound indexes
+                        for search_value in search_keys:
+                            if elem_index_value == search_value:
+                                matched = True
+                                break
+                    
+                    if matched:
                         result.append(elem)
             return result
 
         else:
-            return list(filter(util.match_attr_multi("id", right), left))
+            # Handle non-indexed queries (regular ID-based get_all)
+            if hasattr(right, 'run'):
+                search_keys = right.run([], scope)
+            else:
+                search_keys = right
+            return list(filter(util.match_attr_multi("id", search_keys), left))
 
 
 class BinOp(BinExp):
