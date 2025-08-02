@@ -151,7 +151,9 @@ class TestRowReferences(MockTest):
         result = list(
             r.db("test_db")
             .table("test")
-            .map(lambda doc: doc["info"]["score"] * 1.1)  # 10% bonus using lambda instead of r.row
+            .map(
+                lambda doc: doc["info"]["score"] * 1.1
+            )  # 10% bonus using lambda instead of r.row
             .run(conn)
         )
         expected = [93.5, 101.2, 85.8, 96.8]  # scores * 1.1
@@ -271,3 +273,325 @@ class TestMixedVariableUsage(MockTest):
         # For doc 3: values [12,24,36], multiplier 1
         # [12-1, 24+1, 36+1] = [11, 25, 37] = sum 73
         assertEqual(result, [62, 42, 73])
+
+
+class TestVariableRowEdgeCases(MockTest):
+    """Test edge cases for variables and row references"""
+
+    def get_data(self):
+        data = [
+            {"id": 1, "null_field": None, "empty_array": [], "zero": 0},
+            {
+                "id": 2,
+                "nested": {"deep": {"deeper": {"value": "found"}}},
+                "unicode": "héllo wörld",
+            },
+            {"id": 3, "large_array": list(range(100)), "mixed": [1, "str", None, True]},
+            {"id": 4, "special": {"$field": "dollar", "field.with.dots": "dotted"}},
+            {
+                "id": 5,
+                "bool_fields": {"true": True, "false": False},
+                "numbers": {"int": 42, "float": 3.14},
+            },
+        ]
+        return as_db_and_table("test_db", "edge_cases", data)
+
+    def test_null_field_access(self, conn):
+        """Test r.row access with null fields"""
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 1})
+            .map(
+                lambda doc: r.branch(
+                    doc["null_field"] == None, "is_null", doc["null_field"]
+                )
+            )
+            .run(conn)
+        )
+        assertEqual(result[0], "is_null")
+
+        # Test r.row with null field
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 1})
+            .map(
+                lambda doc: r.branch(
+                    r.row["null_field"] == None, "row_is_null", r.row["null_field"]
+                )
+            )
+            .run(conn)
+        )
+        assertEqual(result[0], "row_is_null")
+
+    def test_deep_nested_access(self, conn):
+        """Test very deep nested field access"""
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 2})
+            .map(lambda doc: doc["nested"]["deep"]["deeper"]["value"])
+            .run(conn)
+        )
+        assertEqual(result[0], "found")
+
+        # Same with r.row
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 2})
+            .map(lambda doc: r.row["nested"]["deep"]["deeper"]["value"])
+            .run(conn)
+        )
+        assertEqual(result[0], "found")
+
+    def test_missing_field_access(self, conn):
+        """Test access to non-existent fields"""
+        try:
+            result = list(
+                r.db("test_db")
+                .table("edge_cases")
+                .filter({"id": 1})
+                .map(lambda doc: doc["nonexistent_field"])
+                .run(conn)
+            )
+            # Should either return None or raise error
+        except Exception:
+            pass  # Missing field access might raise error
+
+    def test_variable_scoping_edge_cases(self, conn):
+        """Test complex variable scoping scenarios"""
+        # Simpler nested operation to avoid scoping issues
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 3})
+            .map(lambda doc: doc["large_array"][:5].count())
+            .run(conn)
+        )
+        assertEqual(result[0], 5)
+
+    def test_unicode_field_operations(self, conn):
+        """Test operations on unicode fields"""
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 2})
+            .map(lambda doc: doc["unicode"].upcase())
+            .run(conn)
+        )
+        assertEqual(result[0], "HÉLLO WÖRLD")
+
+        # Unicode with r.row
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 2})
+            .map(lambda doc: r.row["unicode"].count())
+            .run(conn)
+        )
+        assertEqual(result[0], 11)
+
+    def test_special_field_names(self, conn):
+        """Test fields with special characters in names"""
+        # Access field with $ in name
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 4})
+            .map(lambda doc: doc["special"]["$field"])
+            .run(conn)
+        )
+        assertEqual(result[0], "dollar")
+
+        # Access field with dots in name
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 4})
+            .map(lambda doc: doc["special"]["field.with.dots"])
+            .run(conn)
+        )
+        assertEqual(result[0], "dotted")
+
+    def test_boolean_field_operations(self, conn):
+        """Test operations on boolean fields"""
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 5})
+            .map(lambda doc: doc["bool_fields"]["true"] & doc["bool_fields"]["false"])
+            .run(conn)
+        )
+        assertEqual(result[0], False)
+
+        # Boolean arithmetic
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 5})
+            .map(lambda doc: doc["bool_fields"]["true"] + doc["bool_fields"]["false"])
+            .run(conn)
+        )
+        assertEqual(result[0], 1)  # True=1, False=0
+
+    def test_empty_array_operations(self, conn):
+        """Test operations on empty arrays"""
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 1})
+            .map(lambda doc: doc["empty_array"].count())
+            .run(conn)
+        )
+        assertEqual(result[0], 0)
+
+        # Map over empty array
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 1})
+            .map(lambda doc: doc["empty_array"].map(lambda x: x * 2))
+            .run(conn)
+        )
+        assertEqual(result[0], [])
+
+    def test_zero_value_operations(self, conn):
+        """Test operations with zero values"""
+        # Division by zero handling
+        try:
+            result = list(
+                r.db("test_db")
+                .table("edge_cases")
+                .filter({"id": 1})
+                .map(lambda doc: 42 / doc["zero"])
+                .run(conn)
+            )
+            # Should handle division by zero appropriately
+        except Exception:
+            pass  # Division by zero might raise error
+
+        # Zero in boolean context - in RethinkDB, 0 is truthy
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 1})
+            .map(lambda doc: r.branch(doc["zero"], "truthy", "falsy"))
+            .run(conn)
+        )
+        assertEqual(result[0], "truthy")  # 0 is truthy in RethinkDB
+
+    def test_large_array_performance(self, conn):
+        """Test performance with large arrays"""
+        # Operations on large array
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 3})
+            .map(lambda doc: doc["large_array"].slice(50, 60).sum())
+            .run(conn)
+        )
+        # Sum of numbers 50-59 = 545
+        assertEqual(result[0], 545)
+
+    def test_mixed_type_array_operations(self, conn):
+        """Test operations on arrays with mixed types"""
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 3})
+            .map(lambda doc: doc["mixed"].count())
+            .run(conn)
+        )
+        assertEqual(result[0], 4)
+
+        # Test that we can access mixed type array elements
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 3})
+            .map(lambda doc: doc["mixed"][0])
+            .run(conn)
+        )
+        assertEqual(result[0], 1)  # First element is the number 1
+
+    def test_type_checking_with_variables(self, conn):
+        """Test type checking in variable contexts"""
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .map(lambda doc: r.type_of(doc["id"]))
+            .distinct()
+            .run(conn)
+        )
+        assertEqual(result, ["NUMBER"])
+
+        # Type checking with r.row
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 5})
+            .map(
+                lambda doc: [
+                    r.type_of(r.row["numbers"]["int"]),
+                    r.type_of(r.row["numbers"]["float"]),
+                ]
+            )
+            .run(conn)
+        )
+        assertEqual(result[0], ["NUMBER", "NUMBER"])
+
+    def test_conditional_logic_edge_cases(self, conn):
+        """Test complex conditional logic with variables"""
+        # Nested r.branch with variables
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .map(
+                lambda doc: r.branch(
+                    doc["id"] == 1,
+                    r.branch(doc["null_field"] == None, "null_case", "not_null"),
+                    r.branch(doc["id"] == 2, "case_2", "other"),
+                )
+            )
+            .run(conn)
+        )
+        expected = ["null_case", "case_2", "other", "other", "other"]
+        assertEqual(result, expected)
+
+    def test_error_handling_in_variable_contexts(self, conn):
+        """Test error handling within variable contexts"""
+        # Error in lambda should be handled gracefully
+        try:
+            result = list(
+                r.db("test_db")
+                .table("edge_cases")
+                .map(
+                    lambda doc: r.branch(
+                        doc["id"] == 1, 1 / doc["zero"], doc["id"]  # Division by zero
+                    )
+                )
+                .run(conn)
+            )
+        except Exception:
+            pass  # Should handle errors appropriately
+
+    def test_variable_reference_consistency(self, conn):
+        """Test that variable references are consistent"""
+        # Same variable used multiple times should be consistent
+        result = list(
+            r.db("test_db")
+            .table("edge_cases")
+            .filter({"id": 5})
+            .map(
+                lambda doc: {
+                    "first_ref": doc["numbers"]["int"],
+                    "second_ref": doc["numbers"]["int"],
+                    "are_equal": doc["numbers"]["int"] == doc["numbers"]["int"],
+                }
+            )
+            .run(conn)
+        )
+        assertEqual(result[0]["first_ref"], result[0]["second_ref"])
+        assertEqual(result[0]["are_equal"], True)

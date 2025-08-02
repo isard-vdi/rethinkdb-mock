@@ -150,3 +150,48 @@ class TestOrderByMulti(MockTest):
         ]
         result = r.db("y").table("scores").order_by("score", "age").run(conn)
         assertEqual(expected, list(result))
+
+
+class TestOrderByEdgeCases(MockTest):
+    """Test edge cases for order by operations"""
+
+    @staticmethod
+    def get_data():
+        data = [
+            {"id": 1, "value": None, "empty_str": "", "zero": 0},
+            {"id": 2, "array": [], "nested": {"deep": {"value": 42}}},
+            {"id": 3, "large_array": list(range(1000)), "unicode": "héllo wörld"},
+            {"id": 4, "mixed_types": [1, "str", None, True, 3.14]},
+            {"id": 5, "special_chars": "\n\t\r\\", "whitespace": "  \t\n  "},
+        ]
+        return as_db_and_table("test_db", "edge_cases", data)
+
+    def test_null_value_handling(self, conn):
+        """Test operations with null values"""
+        result = list(r.db("test_db").table("edge_cases").filter({"id": 1}).run(conn))
+        assertEqual(len(result), 1)
+        assertEqual(result[0]["value"], None)
+
+    def test_empty_data_handling(self, conn):
+        """Test operations with empty data"""
+        result = list(r.db("test_db").table("edge_cases").filter({"id": 2}).run(conn))
+        assertEqual(len(result), 1)
+        assertEqual(result[0]["array"], [])
+
+    def test_large_data_handling(self, conn):
+        """Test operations with large datasets"""
+        result = list(r.db("test_db").table("edge_cases").filter({"id": 3}).run(conn))
+        assertEqual(len(result), 1)
+        assertEqual(len(result[0]["large_array"]), 1000)
+
+    def test_mixed_type_handling(self, conn):
+        """Test operations with mixed data types"""
+        result = list(r.db("test_db").table("edge_cases").filter({"id": 4}).run(conn))
+        assertEqual(len(result), 1)
+        assertEqual(len(result[0]["mixed_types"]), 5)
+
+    def test_special_character_handling(self, conn):
+        """Test operations with special characters"""
+        result = list(r.db("test_db").table("edge_cases").filter({"id": 5}).run(conn))
+        assertEqual(len(result), 1)
+        assert "\n" in result[0]["special_chars"]

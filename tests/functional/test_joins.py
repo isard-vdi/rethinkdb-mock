@@ -1,5 +1,6 @@
 from rethinkdb import r
 from tests.common import assertEqUnordered
+from tests.common import assertEqual
 from tests.functional.common import MockTest
 
 
@@ -162,3 +163,114 @@ class TestZip(MockTest):
             .run(conn)
         )
         assertEqUnordered(expected, list(result))
+
+
+class TestJoinEdgeCases(MockTest):
+    """Test edge cases for join operations"""
+
+    @staticmethod
+    def get_data():
+        # Extended data with edge cases
+        people_data = [
+            {"id": "person-1", "name": "Alice", "dept_id": "dept-1"},
+            {"id": "person-2", "name": "Bob", "dept_id": "dept-2"},
+            {"id": "person-3", "name": "Charlie", "dept_id": "dept-3"},
+            {
+                "id": "person-4",
+                "name": "David",
+                "dept_id": "nonexistent",
+            },  # No matching dept
+            {"id": "person-5", "name": "Eve", "dept_id": None},  # Null dept_id
+        ]
+
+        dept_data = [
+            {"id": "dept-1", "name": "Engineering", "manager_id": "person-1"},
+            {"id": "dept-2", "name": "Marketing", "manager_id": "person-2"},
+            {"id": "dept-3", "name": "Sales", "manager_id": None},  # No manager
+            {
+                "id": "dept-orphan",
+                "name": "Orphaned",
+                "manager_id": "person-999",
+            },  # No matching person
+        ]
+
+        # Empty table for testing
+        empty_data = []
+
+        return {
+            "dbs": {
+                "test_db": {
+                    "tables": {
+                        "people": people_data,
+                        "departments": dept_data,
+                        "empty_table": empty_data,
+                    }
+                }
+            }
+        }
+
+    def test_eq_join_no_matches(self, conn):
+        """Test eq_join when left side has no matches in right side"""
+        # Person with nonexistent dept_id
+        result = list(
+            r.db("test_db")
+            .table("people")
+            .filter({"id": "person-4"})
+            .eq_join("dept_id", r.db("test_db").table("departments"))
+            .run(conn)
+        )
+        # Should return empty result
+        assertEqual(len(result), 0)
+
+    def test_eq_join_with_nulls(self, conn):
+        """Test eq_join with null values"""
+        # Person with null dept_id should not match anything
+        result = list(
+            r.db("test_db")
+            .table("people")
+            .filter({"id": "person-5"})
+            .eq_join("dept_id", r.db("test_db").table("departments"))
+            .run(conn)
+        )
+        assertEqual(len(result), 0)
+
+    def test_eq_join_empty_tables(self, conn):
+        """Test eq_join with empty tables"""
+        result = list(
+            r.db("test_db")
+            .table("empty_table")
+            .eq_join("id", r.db("test_db").table("departments"))
+            .run(conn)
+        )
+        assertEqual(len(result), 0)
+
+    def test_inner_join_edge_cases(self, conn):
+        """Test inner_join with edge cases"""
+        # Inner join with always false predicate
+        result = list(
+            r.db("test_db")
+            .table("people")
+            .inner_join(
+                r.db("test_db").table("departments"), lambda person, dept: False
+            )
+            .run(conn)
+        )
+        assertEqual(len(result), 0)
+
+    def test_outer_join_edge_cases(self, conn):
+        """Test outer_join with edge cases"""
+        # Outer join where some left items have no matches
+        result = list(
+            r.db("test_db")
+            .table("people")
+            .outer_join(
+                r.db("test_db").table("departments"),
+                lambda person, dept: person["dept_id"] == dept["id"],
+            )
+            .run(conn)
+        )
+        # Should include all people, even those without matching departments
+        assertEqual(len(result), 5)  # All 5 people should be included
+
+        # Check that we got a reasonable number of results (simplified assertion)
+        assert len(result) >= 3  # Should have at least inner join results
