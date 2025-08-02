@@ -148,11 +148,14 @@ def is_simple(x):
 
 @curry2
 def has_attrs(attr_list, thing):
+    # Handle case where attr_list is wrapped in another list (e.g., [['field1', 'field2']])
+    if len(attr_list) == 1 and isinstance(attr_list[0], list):
+        attr_list = attr_list[0]
+
     result = True
     for attr in attr_list:
         if attr not in thing:
             result = False
-            break
     return result
 
 
@@ -282,6 +285,10 @@ def clone_array(x):
 
 @curry2
 def without(bad_attrs, thing):
+    # Handle case where bad_attrs is wrapped in another list (e.g., [['field1', 'field2']])
+    if len(bad_attrs) == 1 and isinstance(bad_attrs[0], list):
+        bad_attrs = bad_attrs[0]
+
     return {k: v for k, v in iteritems(thing) if k not in bad_attrs}
 
 
