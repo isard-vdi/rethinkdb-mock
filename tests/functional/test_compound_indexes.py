@@ -176,6 +176,23 @@ class TestCompoundIndexes(MockTest):
         ).run(conn)
         r.db("test_db").table("users").index_wait("full_name").run(conn)
 
+        # Debug: Also test each key individually to see what works
+        result_smith = list(
+            r.db("test_db")
+            .table("users")
+            .get_all(["Smith", "John"], index="full_name")
+            .run(conn)
+        )
+        print(f"Smith only: {len(result_smith)} records")
+
+        result_doe = list(
+            r.db("test_db")
+            .table("users")
+            .get_all(["Doe", "John"], index="full_name")
+            .run(conn)
+        )
+        print(f"Doe only: {len(result_doe)} records")
+
         # Query with multiple compound keys
         result = list(
             r.db("test_db")
@@ -183,6 +200,11 @@ class TestCompoundIndexes(MockTest):
             .get_all(["Smith", "John"], ["Doe", "John"], index="full_name")
             .run(conn)
         )
+
+        # Debug: Print actual result length
+        print(f"Debug: Found {len(result)} records, expected 3")
+        for user in result:
+            print(f"  {user['id']}: {user['first_name']} {user['last_name']}")
 
         # Should find John Smith (2 records) and John Doe (1 record)
         assertEqual(len(result), 3)

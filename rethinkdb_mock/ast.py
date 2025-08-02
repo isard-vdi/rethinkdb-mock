@@ -256,25 +256,36 @@ class GetAll(BinExp):
 
                     # Handle compound indexes (arrays) specially
                     if isinstance(elem_index_value, (list, tuple)):
-                        # If we have a single search key that's an array (compound index query)
-                        if len(search_keys) > 0 and isinstance(
-                            search_keys[0], (list, tuple)
+                        # Check if we have multiple compound keys or a single compound key
+                        # Multiple compound keys: [["Smith", "John"], ["Doe", "John"]]
+                        # Single compound key: ["Smith", "John"]
+
+                        # If search_keys is a list where all elements are lists/tuples,
+                        # then we have multiple compound keys
+                        if (
+                            isinstance(search_keys, list)
+                            and len(search_keys) > 0
+                            and all(
+                                isinstance(key, (list, tuple)) for key in search_keys
+                            )
                         ):
                             # Multiple compound keys to search for
                             for search_value in search_keys:
-                                if isinstance(search_value, (list, tuple)):
-                                    if len(elem_index_value) == len(
-                                        search_value
-                                    ) and all(
-                                        a == b
-                                        for a, b in zip(elem_index_value, search_value)
-                                    ):
-                                        matched = True
-                                        break
+                                if len(elem_index_value) == len(search_value) and all(
+                                    a == b
+                                    for a, b in zip(elem_index_value, search_value)
+                                ):
+                                    matched = True
+                                    break
                         else:
-                            # search_keys might be the compound key itself
-                            if len(elem_index_value) == len(search_keys) and all(
-                                a == b for a, b in zip(elem_index_value, search_keys)
+                            # Single compound key: search_keys is the compound key itself
+                            if (
+                                isinstance(search_keys, (list, tuple))
+                                and len(elem_index_value) == len(search_keys)
+                                and all(
+                                    a == b
+                                    for a, b in zip(elem_index_value, search_keys)
+                                )
                             ):
                                 matched = True
                     else:
@@ -331,7 +342,7 @@ class Neq(BinOp):
 
 class Add(BinOp):
     binop = operator.add
-    
+
     def __init__(self, left, right=None, optargs=None):
         if right is None and isinstance(left, Args):
             # This is r.add(r.args([...])) - store the Args node
@@ -343,7 +354,7 @@ class Add(BinOp):
             # Normal binary add
             self.is_args_expansion = False
             super().__init__(left, right, optargs)
-    
+
     def run(self, arg, scope):
         if self.is_args_expansion:
             # Expand the args array and sum all values
@@ -356,13 +367,13 @@ class Add(BinOp):
 
 class MultiAdd(RBase):
     """Handle r.add(a, b, c, ...) with multiple arguments"""
-    
+
     def __init__(self, args, optargs=None):
         self.args = args
         super().__init__(optargs)
-    
+
     def run(self, arg, scope):
-        values = [a.run(arg, scope) if hasattr(a, 'run') else a for a in self.args]
+        values = [a.run(arg, scope) if hasattr(a, "run") else a for a in self.args]
         return sum(values)
 
 
@@ -650,11 +661,11 @@ class WithFields(BinExp):
     def do_run(self, sequence, keys, arg, scope):
         # WithFields should select only the specified fields from each document
         # keys might be a single field name, a list of field names, or individual arguments
-        
+
         # If keys is a list of AST nodes (from multiple arguments), evaluate them
-        if isinstance(keys, list) and all(hasattr(k, 'run') for k in keys):
+        if isinstance(keys, list) and all(hasattr(k, "run") for k in keys):
             key_list = [k.run(arg, scope) for k in keys]
-        elif hasattr(keys, 'run'):
+        elif hasattr(keys, "run"):
             # Single AST node
             evaluated_keys = keys.run(arg, scope)
             if isinstance(evaluated_keys, str):
@@ -669,7 +680,7 @@ class WithFields(BinExp):
             key_list = keys
         else:
             key_list = [keys]
-        
+
         result = []
         for elem in sequence:
             if isinstance(elem, dict):
@@ -679,30 +690,30 @@ class WithFields(BinExp):
             else:
                 # If not a dict, can't select fields
                 result.append(elem)
-        
+
         return result
 
 
 class WithFieldsMulti(RBase):
     """Handle with_fields with multiple field arguments"""
-    
+
     def __init__(self, sequence, field_args, optargs=None):
         self.sequence = sequence
         self.field_args = field_args  # List of RQL field name nodes
         super().__init__(optargs)
-    
+
     def run(self, arg, scope):
         # Get the sequence
         sequence_data = self.sequence.run(arg, scope)
-        
+
         # Evaluate each field name
         field_names = []
         for field_node in self.field_args:
-            if hasattr(field_node, 'run'):
+            if hasattr(field_node, "run"):
                 field_names.append(field_node.run(arg, scope))
             else:
                 field_names.append(field_node)
-        
+
         # Apply field selection
         result = []
         for elem in sequence_data:
@@ -713,7 +724,7 @@ class WithFieldsMulti(RBase):
             else:
                 # If not a dict, can't select fields
                 result.append(elem)
-        
+
         return result
 
 
@@ -735,14 +746,14 @@ class Limit(BinExp):
 class Slice(BinExp):
     def do_run(self, sequence, indices, arg, scope):
         # indices is now an RDatum containing [start, end] or [start]
-        if hasattr(indices, 'run'):
+        if hasattr(indices, "run"):
             indices_list = indices.run(arg, scope)
         else:
             indices_list = indices
-            
+
         start = indices_list[0] if len(indices_list) > 0 else 0
         end = indices_list[1] if len(indices_list) > 1 else None
-        
+
         return util.slice_with(start, end)(sequence)
 
 
@@ -916,7 +927,14 @@ class Union(BinExp):
 
 class Sample(BinExp):
     def do_run(self, sequence, sample_n, arg, scope):
-        return random.sample(list(sequence), sample_n)
+        sequence_list = list(sequence)
+        # Handle edge case where sample size is larger than population
+        if sample_n >= len(sequence_list):
+            return sequence_list
+        # Handle edge case where sequence is empty
+        if len(sequence_list) == 0:
+            return []
+        return random.sample(sequence_list, sample_n)
 
 
 class OffsetsOfValue(BinExp):
@@ -1415,7 +1433,7 @@ class During(Ternary):
 class StrMatch(BinExp):
     def do_run(self, string, pattern, arg, scope):
         import re
-        
+
         try:
             match = re.search(pattern, string)
             if match:
@@ -1423,18 +1441,18 @@ class StrMatch(BinExp):
                     "str": match.group(0),
                     "start": match.start(),
                     "end": match.end(),
-                    "groups": []
+                    "groups": [],
                 }
-                
+
                 # Add captured groups
                 for i, group in enumerate(match.groups()):
                     group_info = {
                         "str": group if group is not None else None,
                         "start": match.start(i + 1) if group is not None else -1,
-                        "end": match.end(i + 1) if group is not None else -1
+                        "end": match.end(i + 1) if group is not None else -1,
                     }
                     result["groups"].append(group_info)
-                
+
                 return result
             else:
                 return None
@@ -1451,20 +1469,20 @@ class Args(RBase):
 class Binary(RBase):
     def __init__(self, data):
         self.data = data
-    
+
     def run(self, arg, scope):
         if self.data is None:
             return b""
-        if hasattr(self.data, 'run'):
+        if hasattr(self.data, "run"):
             result = self.data.run(arg, scope)
         else:
             result = self.data
-        
+
         # Convert to bytes if it's not already
         if isinstance(result, bytes):
             return result
         elif isinstance(result, str):
-            return result.encode('utf-8')
+            return result.encode("utf-8")
         else:
             return bytes(result)
 
@@ -1477,17 +1495,17 @@ class ForEach(RBase):
     def run(self, arg, scope=None):
         sequence = self.left.run(arg, scope)
         result = []
-        
+
         for item in sequence:
             # Apply the function to each item
             function_result = self.right.run(item, scope)
-            
+
             # Flatten the result - if it's a list/sequence, extend; otherwise append
             if isinstance(function_result, (list, tuple)):
                 result.extend(function_result)
             else:
                 result.append(function_result)
-        
+
         return result
 
 
@@ -1894,12 +1912,12 @@ class Args(RBase):
         # Args is special - it's used to expand an array into function arguments
         # The actual expansion is handled by the calling function (like Add)
         # Here we just return the array values
-        if hasattr(self.array_expr, 'run'):
+        if hasattr(self.array_expr, "run"):
             result = self.array_expr.run(arg, scope)
         else:
             result = self.array_expr
-        
+
         if not isinstance(result, (list, tuple)):
             raise TypeError("r.args() requires an array argument")
-        
+
         return result

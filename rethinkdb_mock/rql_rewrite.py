@@ -127,10 +127,11 @@ def makearray_of_datums(datum_list):
 def binop_splat(Mt_Constructor, node):
     args = node._args
     left = type_dispatch(args[0])
-    if isinstance(args[1], r_ast.MakeArray):
-        right = type_dispatch(args[1])
-    else:
-        right = makearray_of_datums(args[1:])
+
+    # For splatted binops, we always want to process all remaining arguments as an array
+    # This is different from regular binops which only have exactly 2 arguments
+    right = makearray_of_datums(args[1:])
+
     return Mt_Constructor(left, right, optargs=process_optargs(node))
 
 
@@ -516,14 +517,14 @@ def handle_rql_constant(node):
 @handles_type(r_ast.Slice)
 def handle_slice(node):
     """Handle array/sequence slicing"""
-    # Package start and end as simple values for BinExp structure  
+    # Package start and end as simple values for BinExp structure
     start = type_dispatch(node._args[1])
     end = type_dispatch(node._args[2]) if len(node._args) > 2 else ast_base.RDatum(None)
     indices = mt_ast.MakeArray([start, end])
     return mt_ast.Slice(
         type_dispatch(node._args[0]),  # sequence
         indices,  # indices as array
-        optargs=process_optargs(node)
+        optargs=process_optargs(node),
     )
 
 
@@ -533,7 +534,7 @@ def handle_skip(node):
     return mt_ast.Skip(
         type_dispatch(node._args[0]),  # sequence
         type_dispatch(node._args[1]),  # count to skip
-        optargs=process_optargs(node)
+        optargs=process_optargs(node),
     )
 
 
@@ -566,11 +567,12 @@ def handle_uuid(node):
 def handle_binary(node):
     """Handle binary data creation"""
     # RethinkDB Binary objects store data in base64_data attribute
-    if hasattr(node, 'base64_data'):
+    if hasattr(node, "base64_data"):
         import base64
+
         binary_data = base64.b64decode(node.base64_data)
         return mt_ast.Binary(binary_data)
-    elif hasattr(node, '_args') and node._args:
+    elif hasattr(node, "_args") and node._args:
         return mt_ast.Binary(type_dispatch(node._args[0]))
     else:
         return mt_ast.Binary(None)
@@ -656,7 +658,7 @@ def handle_concat_map(node):
     """Handle concat_map function"""
     return mt_ast.ConcatMap(
         type_dispatch(node._args[0]),  # sequence
-        type_dispatch(node._args[1])   # mapping function
+        type_dispatch(node._args[1]),  # mapping function
     )
 
 
@@ -665,12 +667,14 @@ def handle_with_fields(node):
     """Handle with_fields function"""
     # WithFields can take multiple field names as arguments
     sequence = type_dispatch(node._args[0])
-    
+
     # For multiple arguments, create a custom WithFields that can handle them
     if len(node._args) > 2:
         # Multiple field arguments: with_fields("name", "age")
         field_names = [type_dispatch(arg) for arg in node._args[1:]]
-        return mt_ast.WithFieldsMulti(sequence, field_names, optargs=process_optargs(node))
+        return mt_ast.WithFieldsMulti(
+            sequence, field_names, optargs=process_optargs(node)
+        )
     else:
         # Single field argument: with_fields("name") or with_fields(["name", "age"])
         field_names = type_dispatch(node._args[1])
