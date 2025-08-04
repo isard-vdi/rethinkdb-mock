@@ -57,8 +57,16 @@ class RDb(MonExp):
     def do_run(self, db_name, arg, scope):
         if hasattr(self, "mockdb_ref"):
             db = self.mockdb_ref
-        else:
+        elif arg is not None:
             db = arg
+        else:
+            # Try to get database context from scope
+            db = scope.get_current_db()
+            if db is None:
+                raise RuntimeError(
+                    "No database context available. This usually happens when r.db() is used "
+                    "inside a lambda function without proper context propagation."
+                )
         return db.get_db(db_name)
 
     def find_db_scope(self):

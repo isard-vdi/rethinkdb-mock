@@ -375,7 +375,9 @@ class MockThink(object):
             self.now_time = self.get_now_time()
 
         query.mockdb_ref = self.data
-        result = query.run(self.data, Scope({}))
+        # Create scope with database context
+        initial_scope = Scope({}).with_current_db(self.data)
+        result = query.run(self.data, initial_scope)
         changes = None
         if isinstance(result, tuple) and isinstance(result[0], MockDb):
             changes = result[1]

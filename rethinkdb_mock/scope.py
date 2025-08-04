@@ -38,19 +38,21 @@ class Scope(object):
     def log(self):
         pprint(self.get_flattened())
 
-    def get_current_row(self):
-        """Get the current row/document being processed"""
-        if hasattr(self, "current_row"):
-            return self.current_row
+    def get_current_db(self):
+        """Get the current database context"""
+        if hasattr(self, "current_db"):
+            return self.current_db
         elif hasattr(self, "parent"):
-            return self.parent.get_current_row()
+            return self.parent.get_current_db()
         else:
-            raise NotInScopeErr("No current row available in this context")
+            return None
 
-    def with_current_row(self, row):
-        """Create a new scope with the current row set"""
+    def with_current_db(self, db):
+        """Create a new scope with the current database context set"""
         new_scope = Scope(self.values)
-        new_scope.current_row = row
+        new_scope.current_db = db
         if hasattr(self, "parent"):
             new_scope.parent = self.parent
+        if hasattr(self, "current_row"):
+            new_scope.current_row = self.current_row
         return new_scope
