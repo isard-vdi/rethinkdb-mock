@@ -138,7 +138,7 @@ class TestDbContextInLambdas(MockTest):
         )
 
         assertEqual(len(result), 2)
-        
+
         # Check Alice's posts
         alice_posts = result[0]["user_info"]["posts"]
         assertEqual(len(alice_posts), 2)
