@@ -146,17 +146,38 @@ def is_simple(x):
     return not (isinstance(x, (list, dict)))
 
 
+def _has_nested_field(spec, thing):
+    """Check if a nested field spec exists in a document.
+
+    Handles string keys, dict specs like {"a": {"b": True}}, and True leaves.
+    """
+    if spec is True:
+        return True
+    if isinstance(spec, str):
+        return spec in thing if isinstance(thing, dict) else False
+    if isinstance(spec, dict):
+        for key, sub_spec in spec.items():
+            if not isinstance(thing, dict) or key not in thing:
+                return False
+            if not _has_nested_field(sub_spec, thing[key]):
+                return False
+        return True
+    return False
+
+
 @curry2
 def has_attrs(attr_list, thing):
     # Handle case where attr_list is wrapped in another list (e.g., [['field1', 'field2']])
     if len(attr_list) == 1 and isinstance(attr_list[0], list):
         attr_list = attr_list[0]
 
-    result = True
     for attr in attr_list:
-        if attr not in thing:
-            result = False
-    return result
+        if isinstance(attr, dict):
+            if not _has_nested_field(attr, thing):
+                return False
+        elif attr not in thing:
+            return False
+    return True
 
 
 @curry2
@@ -234,6 +255,16 @@ def pluck_extended(query: dict, data, path=None):
     if path is None:
         path = []
 
+    # If query is True, include the field at the current path
+    if query is True:
+        value = data
+        for p in path:
+            try:
+                value = value[p]
+            except (KeyError, TypeError, IndexError):
+                return dict()
+        return value
+
     # If query is a string, return a string value
     if isinstance(query, str):
         value = data
@@ -283,13 +314,46 @@ def clone_array(x):
     return [elem for elem in x]
 
 
+def _without_nested(spec, thing):
+    """Remove nested fields from a document based on a dict spec."""
+    if not isinstance(thing, dict):
+        return thing
+    result = {}
+    for k, v in iteritems(thing):
+        if k in spec:
+            sub = spec[k]
+            if sub is True:
+                continue  # Remove this field
+            elif isinstance(sub, dict):
+                result[k] = _without_nested(sub, v)
+            else:
+                continue
+        else:
+            result[k] = v
+    return result
+
+
 @curry2
 def without(bad_attrs, thing):
     # Handle case where bad_attrs is wrapped in another list (e.g., [['field1', 'field2']])
     if len(bad_attrs) == 1 and isinstance(bad_attrs[0], list):
         bad_attrs = bad_attrs[0]
 
-    return {k: v for k, v in iteritems(thing) if k not in bad_attrs}
+    # Separate string keys from dict specs
+    str_keys = set()
+    dict_specs = {}
+    for attr in bad_attrs:
+        if isinstance(attr, str):
+            str_keys.add(attr)
+        elif isinstance(attr, dict):
+            dict_specs.update(attr)
+
+    result = {k: v for k, v in iteritems(thing) if k not in str_keys}
+
+    if dict_specs:
+        result = _without_nested(dict_specs, result)
+
+    return result
 
 
 def obj_clone(a_dict):

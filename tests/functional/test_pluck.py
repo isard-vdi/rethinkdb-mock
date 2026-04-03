@@ -108,3 +108,85 @@ class TestPlucking2(MockTest):
             .run(conn)
         )
         assertEqUnordered(expected, result)
+
+
+class TestPluckNestedTrue(MockTest):
+    """Test pluck with True leaf values in nested dict specs"""
+
+    @staticmethod
+    def get_data():
+        data = [
+            {
+                "id": "doc-1",
+                "name": "Doc 1",
+                "create_dict": {
+                    "hardware": {
+                        "disks": {"storage_id": "stor-1", "size": 50},
+                        "memory": 4096,
+                    }
+                },
+            },
+            {
+                "id": "doc-2",
+                "name": "Doc 2",
+                "create_dict": {
+                    "hardware": {
+                        "disks": {"storage_id": "stor-2", "size": 100},
+                        "memory": 8192,
+                    }
+                },
+            },
+        ]
+        return as_db_and_table("test_db", "docs", data)
+
+    def test_pluck_nested_true(self, conn):
+        """Pluck with True leaf extracts only the specified nested field"""
+        expected = [
+            {"create_dict": {"hardware": {"disks": {"storage_id": "stor-1"}}}},
+            {"create_dict": {"hardware": {"disks": {"storage_id": "stor-2"}}}},
+        ]
+        result = (
+            r.db("test_db")
+            .table("docs")
+            .pluck({"create_dict": {"hardware": {"disks": {"storage_id": True}}}})
+            .run(conn)
+        )
+        assertEqUnordered(expected, list(result))
+
+    def test_pluck_nested_true_with_string_fields(self, conn):
+        """Pluck combining string fields and nested True spec"""
+        expected = [
+            {
+                "id": "doc-1",
+                "name": "Doc 1",
+                "create_dict": {"hardware": {"disks": {"storage_id": "stor-1"}}},
+            },
+            {
+                "id": "doc-2",
+                "name": "Doc 2",
+                "create_dict": {"hardware": {"disks": {"storage_id": "stor-2"}}},
+            },
+        ]
+        result = (
+            r.db("test_db")
+            .table("docs")
+            .pluck(
+                "id",
+                "name",
+                {"create_dict": {"hardware": {"disks": {"storage_id": True}}}},
+            )
+            .run(conn)
+        )
+        assertEqUnordered(expected, list(result))
+
+    def test_pluck_nested_true_missing_field(self, conn):
+        """Pluck with True on a field that doesn't exist returns empty dict"""
+        result = (
+            r.db("test_db")
+            .table("docs")
+            .pluck({"create_dict": {"hardware": {"disks": {"nonexistent": True}}}})
+            .run(conn)
+        )
+        for doc in result:
+            # Missing fields produce empty dicts at the leaf level
+            assert doc["create_dict"]["hardware"]["disks"]["nonexistent"] == {}

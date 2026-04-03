@@ -336,6 +336,104 @@ class TestGetAll(MockTest):
         assertEqual(result[0]["id"], 2)
 
 
+class TestGetAllWithArgs(MockTest):
+    """Test get_all() with r.args() for dynamic key expansion"""
+
+    def get_data(self):
+        data = [
+            {"id": "a", "name": "Alice"},
+            {"id": "b", "name": "Bob"},
+            {"id": "c", "name": "Charlie"},
+            {"id": "d", "name": "Diana"},
+        ]
+        return as_db_and_table("test_db", "test", data)
+
+    def test_get_all_with_args_by_id(self, conn):
+        """r.args() expands a list into get_all arguments"""
+        ids = ["a", "c"]
+        result = list(r.db("test_db").table("test").get_all(r.args(ids)).run(conn))
+        assertEqual(len(result), 2)
+        actual_ids = {item["id"] for item in result}
+        assertEqual(actual_ids, {"a", "c"})
+
+    def test_get_all_with_args_by_index(self, conn):
+        """r.args() works with secondary indexes"""
+        r.db("test_db").table("test").index_create("name").run(conn)
+        r.db("test_db").table("test").index_wait("name").run(conn)
+
+        names = ["Alice", "Diana"]
+        result = list(
+            r.db("test_db").table("test").get_all(r.args(names), index="name").run(conn)
+        )
+        assertEqual(len(result), 2)
+        actual_names = {item["name"] for item in result}
+        assertEqual(actual_names, {"Alice", "Diana"})
+
+    def test_get_all_with_args_empty(self, conn):
+        """r.args() with empty list returns no results"""
+        result = list(r.db("test_db").table("test").get_all(r.args([])).run(conn))
+        assertEqual(len(result), 0)
+
+
+class TestHasFieldsNested(MockTest):
+    """Test has_fields() with nested dict specs"""
+
+    def get_data(self):
+        data = [
+            {"id": 1, "a": {"b": {"c": 1}}, "name": "has_nested"},
+            {"id": 2, "a": {"b": {}}, "name": "missing_c"},
+            {"id": 3, "a": {}, "name": "missing_b"},
+            {"id": 4, "name": "missing_a"},
+        ]
+        return as_db_and_table("test_db", "test", data)
+
+    def test_has_fields_nested_true(self, conn):
+        """has_fields with nested dict True spec"""
+        result = list(
+            r.db("test_db")
+            .table("test")
+            .has_fields({"a": {"b": {"c": True}}})
+            .run(conn)
+        )
+        assertEqual(len(result), 1)
+        assertEqual(result[0]["id"], 1)
+
+    def test_has_fields_nested_partial(self, conn):
+        """has_fields with partial nesting"""
+        result = list(
+            r.db("test_db").table("test").has_fields({"a": {"b": True}}).run(conn)
+        )
+        assertEqual(len(result), 2)
+        actual_ids = {item["id"] for item in result}
+        assertEqual(actual_ids, {1, 2})
+
+    def test_has_fields_mixed(self, conn):
+        """has_fields with both string and nested dict"""
+        result = list(
+            r.db("test_db").table("test").has_fields("name", {"a": True}).run(conn)
+        )
+        assertEqual(len(result), 3)
+
+
+class TestWithoutNested(MockTest):
+    """Test without() with nested dict specs"""
+
+    def get_data(self):
+        data = [
+            {"id": 1, "a": {"b": 1, "c": 2}, "name": "test"},
+        ]
+        return as_db_and_table("test_db", "test", data)
+
+    def test_without_nested_field(self, conn):
+        """without with nested dict removes only specified nested field"""
+        result = list(
+            r.db("test_db").table("test").without({"a": {"b": True}}).run(conn)
+        )
+        assertEqual(len(result), 1)
+        assertEqual(result[0]["a"], {"c": 2})
+        assertEqual(result[0]["name"], "test")
+
+
 if __name__ == "__main__":
     from tests.fixtures import unittest
 
