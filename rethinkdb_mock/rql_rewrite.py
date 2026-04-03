@@ -128,9 +128,14 @@ def binop_splat(Mt_Constructor, node):
     args = node._args
     left = type_dispatch(args[0])
 
-    # For splatted binops, we always want to process all remaining arguments as an array
-    # This is different from regular binops which only have exactly 2 arguments
-    right = makearray_of_datums(args[1:])
+    # When r.args() is the sole argument, dispatch it directly so its run()
+    # returns a flat list instead of being wrapped in another MakeArray.
+    if len(args) == 2 and isinstance(args[1], r_ast.Args):
+        right = type_dispatch(args[1])
+    else:
+        # For splatted binops, we always want to process all remaining arguments as an array
+        # This is different from regular binops which only have exactly 2 arguments
+        right = makearray_of_datums(args[1:])
 
     return Mt_Constructor(left, right, optargs=process_optargs(node))
 
